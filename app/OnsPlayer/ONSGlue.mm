@@ -206,6 +206,24 @@ int GP_ONS_Entry(int argc, char **argv) {
         if (access(fn, R_OK) == 0) fprintf(stderr, "[ONSApp] 找到脚本: %s\n", fn);
     }
 
+    // 1.5 GPU 可用性直测（判断是环境禁用还是 SDL 窗口问题）
+    {
+        int ndrv = SDL_GetNumRenderDrivers();
+        fprintf(stderr, "[ONSApp] 预检: 渲染驱动=%d\n", ndrv);
+    }
+    @autoreleasepool {
+        Class mtlCls = NSClassFromString(@"MTLCreateSystemDefaultDevice");
+        (void)mtlCls;
+        id dev = ((id (*)(void))NSClassFromString(@"MTLCreateSystemDefaultDevice"))();
+        fprintf(stderr, "[ONSApp] 预检: MTLCreateSystemDefaultDevice = %s\n", dev ? "OK" : "nil(GPU 不可用)");
+        UIScreen *scr = [UIScreen mainScreen];
+        CGRect b = scr ? scr.bounds : CGRectZero;
+        fprintf(stderr, "[ONSApp] 预检: mainScreen=%.0fx%.0f scale=%.1f\n",
+                b.size.width, b.size.height, scr ? scr.scale : 0.0);
+        fprintf(stderr, "[ONSApp] 预检: videoDriver=%s\n",
+                SDL_GetCurrentVideoDriver() ? SDL_GetCurrentVideoDriver() : "(null)");
+    }
+
     // 2. SDL 环境
     SDL_SetHint(SDL_HINT_ORIENTATIONS, "LandscapeLeft LandscapeRight");
     SDL_SetHint(SDL_HINT_TOUCH_MOUSE_EVENTS, "0");
