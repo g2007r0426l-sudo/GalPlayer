@@ -27,6 +27,10 @@ REPLACEMENTS = [
     ("SDLK_KP7", "SDLK_KP_7", "SDLK_KP7 -> SDLK_KP_7"),
     ("SDLK_KP8", "SDLK_KP_8", "SDLK_KP8 -> SDLK_KP_8"),
     ("SDLK_KP9", "SDLK_KP_9", "SDLK_KP9 -> SDLK_KP_9"),
+    # SDL_mixer 2.8+: Mix_LoadMUS_RW 需要 freesrc 参数
+    ("Mix_LoadMUS_RW(SDL_RWFromMem(buffer, length))",
+     "Mix_LoadMUS_RW(SDL_RWFromMem(buffer, length), 1)",
+     "Mix_LoadMUS_RW 补 freesrc 参数"),
 ]
 
 CALL_REMOVALS = [
