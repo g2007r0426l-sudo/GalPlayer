@@ -39,6 +39,48 @@ SDL2 iOS 后端的标准启动路径是 `SDL_UIKitRunApp(argc, argv, mainFunc)`�
 
 ## 4. ONScripter 为什么走"兼容层"而不是改源码
 
+### 4.1 实测得到的 SDL1.2 → SDL2 兼容矩阵（全部经过 iOS 真机链路编译验证）
+
+**shim 层（`engines/onscripter/sdl2_compat/onsdl_compat.h`，零源码改动）**
+
+| SDL1.2 符号 | SDL2 处理 |
+|---|---|
+| `SDL_SetVideoMode` / `SDL_GetVideoSurface` / `SDL_Flip` / `SDL_UpdateRect(s)` | 自研 compat 实现（SDL_Window + SDL_Renderer + ARGB8888 流式纹理） |
+| `SDL_SetAlpha` | `SDL_SetSurfaceAlphaMod` + `SDL_SetSurfaceBlendMode` |
+| `SDL_WM_SetCaption` / `SDL_WM_GetCaption` | `SDL_SetWindowTitle` |
+| `SDL_EnableUNICODE` / `SDL_EnableKeyRepeat` / `SDL_GetWMInfo` | 空桩 |
+| `SDL_ListModes` / `SDL_GetVideoInfo` / `SDL_SetGamma` | 桩（返回 NULL / 静态结构 / 0） |
+| `SDL_Overlay`（YUV 视频帧） | 结构体类型定义（仅编译需要；smpeg/ANDROID 宏内不执行） |
+| `SDL_GetAppState` | 桩（恒返回前台聚焦） |
+| `SDL_WM_ToggleFullScreen` | 宏替换为 `(0)` |
+| `SDLKey` | `typedef SDL_Keycode SDLKey` |
+| `SDL_BUTTON_WHEELUP/DOWN` | 常量 4/5（iOS 无滚轮，仅供编译） |
+| `SDL_VIDEOEXPOSE` | 保留事件值 0x7F00（SDL 永不产生，运行期不可达） |
+
+**源码补丁层（`patch_ons_sources.py`，Python 确定性替换 + 自动备份）**
+
+| 原符号 | 替换 | 原因 |
+|---|---|---|
+| `keysym.unicode` | `keysym.sym` | SDL2 移除 unicode 字段 |
+| `SDL_ACTIVEEVENT` / `event.active.*` | `SDL_WINDOWEVENT` / `event.window.data*` | 事件模型变更 |
+| `SDL_WarpMouse(` | `SDL_WarpMouseInWindow(NULL, ` | 函数改名 |
+| `SDL_mutexP(` / `SDL_mutexV(` | `SDL_LockMutex(` / `SDL_UnlockMutex(` | 宏移除 |
+| `SDLK_KP0..9` | `SDLK_KP_0..9` | 键名加下划线 |
+| `Mix_LoadMUS_RW(x)` | `Mix_LoadMUS_RW(x, 1)` | SDL_mixer 2.8 签名变更 |
+
+**⚠ 血泪教训**：`sed -i '' -E` 在 macOS runner 上会**静默失败**（补丁打印成功但文件未改）。
+改为 Python 字符串替换后一次通过 —— 任何跨平台补丁脚本都应避免 shell sed 方言。
+
+### 4.2 构建依赖清单（实测）
+
+`SDL2`（`SDL_LIBC` 保持默认；`SDL_config.h` 必须用 **CMake 生成版**，源码模板版会导致
+`Sint64` 断言失败）· `SDL_image`（`SDL2IMAGE_BACKEND_IMAGEIO=OFF` + `STB=ON`）·
+`SDL_ttf`（`SDL2TTF_VENDORED=ON`，头文件在 2.20 的仓库根部）·
+`SDL_mixer`（关 OPUS/MOD/MIDI/WAVPACK，保留 WAV/OGG/FLAC/MP3 内置解码）·
+`libjpeg-turbo`（`CMAKE_SYSTEM_PROCESSOR=arm64` 必传）· `libogg/libvorbis/libvorbisfile` · `freetype`
+
+## 5. Kirikiroid2 构建脚本的自适应设计
+
 官方 ONScripter（含 JH）基于 SDL 1.2。方案对比：
 
 | 方案 | 结论 |
