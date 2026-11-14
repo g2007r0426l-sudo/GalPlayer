@@ -194,9 +194,9 @@ build_sdl_ext "image" "libsdl-org/SDL_image" "release-2.6.3|release-2.8.4|releas
 # SDL_ttf: freetype/harfbuzz 子模块 vendored 构建（recurse clone 已就位）；关闭示例程序
 build_sdl_ext "ttf"   "libsdl-org/SDL_ttf"   "release-2.22.1|release-2.20.2|release-2.0.18" "yes" \
     -DSDL2TTF_VENDORED=ON -DSDL2TTF_SAMPLES=OFF
-# SDL_mixer: 内置解码器；关闭 OPUS（无系统 opusfile）与 MOD（无系统 libxmp，ON 游戏不用 MOD）
+# SDL_mixer: 内置解码器；关闭 OPUS/MOD/MIDI（系统无 opusfile/libxmp/fluidsynth，且 ONS 游戏少用）
 build_sdl_ext "mixer" "libsdl-org/SDL_mixer" "release-2.8.0|release-2.6.3" "no" \
-    -DSDL2MIXER_SAMPLES=OFF -DSDL2MIXER_OPUS=OFF -DSDL2MIXER_MOD=OFF
+    -DSDL2MIXER_SAMPLES=OFF -DSDL2MIXER_OPUS=OFF -DSDL2MIXER_MOD=OFF -DSDL2MIXER_MIDI=OFF
 
 # 记录版本
 {
