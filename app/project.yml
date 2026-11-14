@@ -38,6 +38,7 @@ settings:
       - "-lons"
       - "-lkrkr2"
       - "-lfreetype"
+      - "-ljpeg"
       - "-lvorbisfile"
       - "-lvorbis"
       - "-logg"

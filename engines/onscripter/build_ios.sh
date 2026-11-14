@@ -93,6 +93,35 @@ if [ ! -f "$BUILD_ROOT/lib/libfreetype.a" ]; then
 fi
 
 # ---------------------------------------------------------------------------
+# 3b. libjpeg-turbo（conv_shared.cpp 等需要 jpeglib.h）
+# ---------------------------------------------------------------------------
+JPEG_DIR="$WORK/thirdparty/libjpeg-turbo"
+JPEG_BUILD="$ROOT_DIR/build/jpeg-ios"
+if [ ! -d "$JPEG_DIR/.git" ]; then
+    rm -rf "$JPEG_DIR"
+    git clone --depth 1 --branch 3.0.4 https://github.com/libjpeg-turbo/libjpeg-turbo.git "$JPEG_DIR" \
+      || git clone --depth 1 --branch 3.0.3 https://github.com/libjpeg-turbo/libjpeg-turbo.git "$JPEG_DIR" \
+      || { echo "[ONS] ERROR: libjpeg-turbo clone 失败"; exit 1; }
+fi
+if [ ! -f "$BUILD_ROOT/lib/libjpeg.a" ]; then
+    cmake -S "$JPEG_DIR" -B "$JPEG_BUILD" -G Ninja \
+        -DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_SYSROOT=iphoneos \
+        -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0 \
+        -DCMAKE_BUILD_TYPE=Release -DENABLE_SHARED=0 -DENABLE_STATIC=1 \
+        -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DCMAKE_POSITION_INDEPENDENT_CODE=1 \
+        -DCMAKE_INSTALL_PREFIX="$JPEG_BUILD/install" -DCMAKE_INSTALL_LIBDIR=lib
+    cmake --build "$JPEG_BUILD" -j "$(sysctl -n hw.ncpu)" --target jpeg-static
+    JPEG_LIB=$(find "$JPEG_BUILD" -name "libjpeg.a" | head -n 1)
+    [ -n "$JPEG_LIB" ] || { echo "[ONS] ERROR: libjpeg.a 未生成"; exit 1; }
+    cp -f "$JPEG_LIB" "$BUILD_ROOT/lib/libjpeg.a"
+    mkdir -p "$BUILD_ROOT/include/jpeg"
+    cp "$JPEG_DIR"/*.h "$BUILD_ROOT/include/jpeg/"
+    cp "$JPEG_BUILD"/jconfig*.h "$BUILD_ROOT/include/jpeg/" 2>/dev/null || true
+    cp "$JPEG_BUILD"/jmorecfg.h "$BUILD_ROOT/include/jpeg/" 2>/dev/null || true
+    echo "[ONS] libjpeg-turbo OK"
+fi
+
+# ---------------------------------------------------------------------------
 # 4. OGG 支持（可选，失败自动跳过）
 # ---------------------------------------------------------------------------
 OGG_FLAGS=""
@@ -150,7 +179,7 @@ COMPAT_INC="$WORK/sdl2_compat"
 CC="xcrun -sdk iphoneos clang"
 CXX="xcrun -sdk iphoneos clang++"
 ARCH="-arch arm64 -miphoneos-version-min=14.0"
-INC=(-I"$COMPAT_INC" -I"$ONS_DIR" -I"$BUILD_ROOT/include" -I"$BUILD_ROOT/include/SDL2" -I"$BUILD_ROOT/include/freetype2" $OGG_INC)
+INC=(-I"$COMPAT_INC" -I"$ONS_DIR" -I"$BUILD_ROOT/include" -I"$BUILD_ROOT/include/SDL2" -I"$BUILD_ROOT/include/freetype2" -I"$BUILD_ROOT/include/jpeg" $OGG_INC)
 CXXFLAGS=(-std=c++14 -O2 $ARCH -fno-objc-arc \
           -DLINUX=1 -DCJK=1 -DNDEBUG $OGG_FLAGS "${INC[@]}")
 
@@ -206,7 +235,9 @@ done
 $CXX "${CXXFLAGS[@]}" -c "$COMPAT_INC/onsdl_compat.cpp" -o "$WORK/obj/onsdl_compat.o"
 OBJS+=("$WORK/obj/onsdl_compat.o")
 
-xcrun -sdk iphoneos ar rcs "$OUT" "${OBJS[@]}"
+xcrun -sdk iphoneos ar rcs "$OUT" "${OBJS[@]}" "$BUILD_ROOT/lib/libjpeg.a" 2>/dev/null || {
+    xcrun -sdk iphoneos ar rcs "$OUT" "${OBJS[@]}"
+}
 xcrun -sdk iphoneos ranlib "$OUT"
 
 echo "[ONS] OK -> $OUT"
