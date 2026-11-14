@@ -38,4 +38,4 @@ while IFS= read -r f; do
     fi
 done < <(find "$APP" -type f 2>/dev/null)
 
-echo "[sign] 完成: 共签 $((N+1)) 个 Mach-O（$APP）"
+echo "[sign] 完成: 共签 $((N+1)) 个 Mach-O -> ${APP}"
