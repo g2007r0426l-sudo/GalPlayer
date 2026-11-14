@@ -16,6 +16,17 @@ REPLACEMENTS = [
     ("SDL_WarpMouse(", "SDL_WarpMouseInWindow(NULL, ", "SDL_WarpMouse -> SDL_WarpMouseInWindow"),
     ("SDL_mutexP(", "SDL_LockMutex(", "SDL_mutexP -> SDL_LockMutex"),
     ("SDL_mutexV(", "SDL_UnlockMutex(", "SDL_mutexV -> SDL_UnlockMutex"),
+    # SDL2 键名: 小键盘数字键加下划线（SDLK_KP0 -> SDLK_KP_0）
+    ("SDLK_KP0", "SDLK_KP_0", "SDLK_KP0 -> SDLK_KP_0"),
+    ("SDLK_KP1", "SDLK_KP_1", "SDLK_KP1 -> SDLK_KP_1"),
+    ("SDLK_KP2", "SDLK_KP_2", "SDLK_KP2 -> SDLK_KP_2"),
+    ("SDLK_KP3", "SDLK_KP_3", "SDLK_KP3 -> SDLK_KP_3"),
+    ("SDLK_KP4", "SDLK_KP_4", "SDLK_KP4 -> SDLK_KP_4"),
+    ("SDLK_KP5", "SDLK_KP_5", "SDLK_KP5 -> SDLK_KP_5"),
+    ("SDLK_KP6", "SDLK_KP_6", "SDLK_KP6 -> SDLK_KP_6"),
+    ("SDLK_KP7", "SDLK_KP_7", "SDLK_KP7 -> SDLK_KP_7"),
+    ("SDLK_KP8", "SDLK_KP_8", "SDLK_KP8 -> SDLK_KP_8"),
+    ("SDLK_KP9", "SDLK_KP_9", "SDLK_KP9 -> SDLK_KP_9"),
 ]
 
 CALL_REMOVALS = [
