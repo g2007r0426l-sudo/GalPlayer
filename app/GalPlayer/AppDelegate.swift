@@ -30,6 +30,14 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
     }
 
     /// 引擎退出后恢复主 UI（GameListViewController 也可能在退出时调用）
+    // 播放器退出后通过 galplayer://return 把我们叫回前台
+    func application(_ app: UIApplication, open url: URL,
+                     options: [UIApplication.OpenURLOptionsKey : Any] = [:]) -> Bool {
+        NotificationCenter.default.post(name: .libraryChanged, object: nil)
+        restoreMainWindow()
+        return true
+    }
+
     func restoreMainWindow() {
         window?.makeKeyAndVisible()
         window?.bringSubviewToFront(window?.rootViewController?.view ?? UIView())
