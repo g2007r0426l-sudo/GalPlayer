@@ -113,6 +113,32 @@ int           SDL_Compat_EnableKeyRepeat(int delay, int interval);
 SDL_VideoInfo*SDL_Compat_GetVideoInfo(void);
 void          onsdl_compat_shutdown(void);   // 停止引擎后由桥接层调用
 
+// ---- SDL1.2 YUV overlay 类型（SDL2 已移除；类型参与编译，运行路径未启用） ----
+typedef struct SDL_Overlay {
+    Uint32  format;
+    int     planes;
+    Uint16  *pitches;
+    Uint8   **pixels;
+    Uint32  hw_overlay;
+    Uint16  w, h;
+} SDL_Overlay;
+
+// ---- SDL1.2 app-state 常量与 SDL_GetAppState ----
+#ifndef SDL_APPMOUSEFOCUS
+#define SDL_APPMOUSEFOCUS  0x01
+#endif
+#ifndef SDL_APPINPUTFOCUS
+#define SDL_APPINPUTFOCUS  0x02
+#endif
+#ifndef SDL_APPACTIVE
+#define SDL_APPACTIVE      0x04
+#endif
+int           SDL_Compat_GetAppState(void);
+#define SDL_GetAppState() SDL_Compat_GetAppState()
+
+// ---- SDL1.2 独有 API 的桩 ----
+#define SDL_WM_ToggleFullScreen(s)              (0)
+
 // ---- SDL1.2 API -> 兼容实现 的宏重定向 ----
 #define SDL_SetVideoMode(w,h,bpp,flags)        SDL_Compat_SetVideoMode((w),(h),(bpp),(flags))
 #define SDL_GetVideoSurface()                  SDL_Compat_GetVideoSurface()

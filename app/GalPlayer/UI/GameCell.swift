@@ -1,83 +1,117 @@
 import UIKit
 
 // =============================================================================
-// 游戏卡片: 占位封面（深色+首字母） + 名称 + 引擎角标
+// 游戏卡片（咔咔喵风）: 渐变封面 + 左上时间胶囊 + 右上引擎角标 + 白色信息脚条
 // =============================================================================
+
+final class ChipLabel: UILabel {
+    init() {
+        super.init(frame: .zero)
+        font = Theme.roundedFont(size: 10, weight: .heavy)
+        textColor = .white
+        textAlignment = .center
+        layer.cornerRadius = 9
+        clipsToBounds = true
+        translatesAutoresizingMaskIntoConstraints = false
+    }
+    required init?(coder: NSCoder) { fatalError("纯代码 UI") }
+
+    func set(text value: String, color: UIColor) {
+        self.text = "  \(value)  "
+        backgroundColor = color
+        isHidden = false
+    }
+}
 
 final class GameCell: UICollectionViewCell {
 
     private let coverView = PlaceholderCoverView()
-    private let badgeLabel = UILabel()
+    private let dimView = UIView()
+    private let timeChip = ChipLabel()
+    private let engineChip = ChipLabel()
     private let nameLabel = UILabel()
+    private let metaLabel = UILabel()
 
     override init(frame: CGRect) {
         super.init(frame: frame)
-        contentView.backgroundColor = .clear
+        contentView.backgroundColor = Theme.cardBg
+        contentView.layer.cornerRadius = 20
+        contentView.layer.masksToBounds = true
+        layer.shadowColor = UIColor.black.cgColor
+        layer.shadowOpacity = 0.08
+        layer.shadowRadius = 10
+        layer.shadowOffset = CGSize(width: 0, height: 4)
 
         coverView.translatesAutoresizingMaskIntoConstraints = false
-        coverView.layer.cornerRadius = 18
-        coverView.clipsToBounds = true
         contentView.addSubview(coverView)
 
-        badgeLabel.font = Theme.roundedFont(size: 11, weight: .heavy)
-        badgeLabel.textColor = .white
-        badgeLabel.textAlignment = .center
-        badgeLabel.layer.cornerRadius = 10
-        badgeLabel.clipsToBounds = true
-        badgeLabel.translatesAutoresizingMaskIntoConstraints = false
-        contentView.addSubview(badgeLabel)
+        dimView.backgroundColor = UIColor(white: 0.1, alpha: 0.4)
+        dimView.translatesAutoresizingMaskIntoConstraints = false
+        dimView.isHidden = true
+        contentView.addSubview(dimView)
 
-        nameLabel.font = Theme.roundedFont(size: 14, weight: .semibold)
+        contentView.addSubview(timeChip)
+        contentView.addSubview(engineChip)
+
+        nameLabel.font = Theme.roundedFont(size: 15, weight: .semibold)
         nameLabel.textColor = Theme.text
-        nameLabel.textAlignment = .center
         nameLabel.lineBreakMode = .byTruncatingTail
         nameLabel.translatesAutoresizingMaskIntoConstraints = false
         contentView.addSubview(nameLabel)
+
+        metaLabel.font = .systemFont(ofSize: 12)
+        metaLabel.textColor = Theme.textSub
+        metaLabel.translatesAutoresizingMaskIntoConstraints = false
+        contentView.addSubview(metaLabel)
 
         NSLayoutConstraint.activate([
             coverView.topAnchor.constraint(equalTo: contentView.topAnchor),
             coverView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
             coverView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
-            coverView.bottomAnchor.constraint(equalTo: nameLabel.topAnchor, constant: -8),
+            coverView.heightAnchor.constraint(equalTo: contentView.widthAnchor, multiplier: 0.60),
 
-            badgeLabel.topAnchor.constraint(equalTo: coverView.topAnchor, constant: 8),
-            badgeLabel.trailingAnchor.constraint(equalTo: coverView.trailingAnchor, constant: -8),
-            badgeLabel.widthAnchor.constraint(greaterThanOrEqualToConstant: 44),
-            badgeLabel.heightAnchor.constraint(equalToConstant: 22),
+            timeChip.topAnchor.constraint(equalTo: coverView.topAnchor, constant: 8),
+            timeChip.leadingAnchor.constraint(equalTo: coverView.leadingAnchor, constant: 8),
+            timeChip.heightAnchor.constraint(equalToConstant: 20),
 
-            nameLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 2),
-            nameLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -2),
-            nameLabel.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
+            engineChip.topAnchor.constraint(equalTo: coverView.topAnchor, constant: 8),
+            engineChip.trailingAnchor.constraint(equalTo: coverView.trailingAnchor, constant: -8),
+            engineChip.heightAnchor.constraint(equalToConstant: 20),
+
+            dimView.topAnchor.constraint(equalTo: coverView.topAnchor),
+            dimView.leadingAnchor.constraint(equalTo: coverView.leadingAnchor),
+            dimView.trailingAnchor.constraint(equalTo: coverView.trailingAnchor),
+            dimView.bottomAnchor.constraint(equalTo: coverView.bottomAnchor),
+
+            nameLabel.topAnchor.constraint(equalTo: coverView.bottomAnchor, constant: 9),
+            nameLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 12),
+            nameLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -12),
+
+            metaLabel.topAnchor.constraint(equalTo: nameLabel.bottomAnchor, constant: 2),
+            metaLabel.leadingAnchor.constraint(equalTo: nameLabel.leadingAnchor),
+            metaLabel.trailingAnchor.constraint(equalTo: nameLabel.trailingAnchor),
+            metaLabel.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -10),
         ])
     }
 
     required init?(coder: NSCoder) { fatalError("纯代码 UI，禁用 storyboard") }
 
-    func configure(with entry: GameEntry) {
-        let engine = EngineRegistry.shared.effectiveEngine(for: entry)
+    func configure(with entry: GameEntry, engine: GameEngine) {
         coverView.title = entry.name
+        timeChip.set(text: TimeAgo.string(from: entry.dirMtime), color: Theme.chipDark)
 
         switch engine {
-        case .kirikiri:
-            badgeLabel.text = " KRKR "
-            badgeLabel.backgroundColor = Theme.badgeKRKR
-        case .onscripter:
-            badgeLabel.text = " ONS "
-            badgeLabel.backgroundColor = Theme.badgeONS
-        case .artemis:
-            badgeLabel.text = " 不支持 "
-            badgeLabel.backgroundColor = Theme.badgeOff
-        case .unknown:
-            badgeLabel.text = " 未知 "
-            badgeLabel.backgroundColor = Theme.badgeOff
+        case .kirikiri:   engineChip.set(text: "KRKR", color: Theme.badgeKRKR)
+        case .onscripter: engineChip.set(text: "ONS", color: Theme.badgeONS)
+        case .artemis:    engineChip.set(text: "不支持", color: Theme.badgeOff)
+        case .unknown:    engineChip.set(text: "未知", color: Theme.badgeOff)
         }
 
-        let disabled = !engine.playable
-        coverView.isDimmed = disabled
-        nameLabel.textColor = disabled ? Theme.textSub : Theme.text
+        let playable = engine.playable
+        dimView.isHidden = playable
         nameLabel.text = entry.name
-        isUserInteractionEnabled = true
-        contentView.alpha = disabled ? 0.85 : 1.0
+        nameLabel.textColor = playable ? Theme.text : Theme.textSub
+        metaLabel.text = playable ? "本地游戏 · \(TimeAgo.string(from: entry.dirMtime))" : "建议用 Artroid+ 打开"
     }
 }
 
@@ -91,8 +125,9 @@ final class PlaceholderCoverView: UIView {
 
     override init(frame: CGRect) {
         super.init(frame: frame)
-        backgroundColor = Theme.card
+        backgroundColor = Theme.cardBg
         isOpaque = false
+        clipsToBounds = true
     }
 
     required init?(coder: NSCoder) { fatalError("纯代码 UI，禁用 storyboard") }
@@ -100,7 +135,6 @@ final class PlaceholderCoverView: UIView {
     override func draw(_ rect: CGRect) {
         guard let ctx = UIGraphicsGetCurrentContext() else { return }
 
-        // 渐变底
         let colors = [Theme.coverTop.cgColor, Theme.coverBottom.cgColor] as CFArray
         if let gradient = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(),
                                      colors: colors, locations: [0, 1]) {
@@ -110,28 +144,23 @@ final class PlaceholderCoverView: UIView {
                                    options: [])
         }
 
-        // 软萌小脸
-        let faceY = bounds.height * 0.40
+        let faceY = bounds.height * 0.44
         let eyeDX = bounds.width * 0.17
         let eyeR = max(3, bounds.width * 0.045)
         let ink = UIColor(white: 0.18, alpha: 0.85)
 
         for sign: CGFloat in [-1, 1] {
             let ex = bounds.midX + sign * eyeDX
-            // 竖椭圆眼睛
             let eyeRect = CGRect(x: ex - eyeR, y: faceY - eyeR * 1.35, width: eyeR * 2, height: eyeR * 2.7)
             let eye = UIBezierPath(roundedRect: eyeRect, cornerRadius: eyeR)
             ink.setFill(); eye.fill()
-            // 眼内高光
             let hl = UIBezierPath(arcCenter: CGPoint(x: ex - eyeR * 0.32, y: faceY - eyeR * 0.8),
                                   radius: eyeR * 0.3, startAngle: 0, endAngle: .pi * 2, clockwise: true)
             UIColor.white.withAlphaComponent(0.9).setFill(); hl.fill()
-            // 腮红
             let blush = UIBezierPath(arcCenter: CGPoint(x: bounds.midX + sign * bounds.width * 0.26, y: faceY + eyeR * 1.5),
                                      radius: bounds.width * 0.055, startAngle: 0, endAngle: .pi * 2, clockwise: true)
             UIColor(red: 1, green: 0.55, blue: 0.65, alpha: 0.45).setFill(); blush.fill()
         }
-        // 微笑
         let mouth = UIBezierPath(arcCenter: CGPoint(x: bounds.midX, y: faceY + eyeR * 1.05),
                                  radius: bounds.width * 0.05,
                                  startAngle: .pi * 0.15, endAngle: .pi * 0.85, clockwise: true)
@@ -140,10 +169,9 @@ final class PlaceholderCoverView: UIView {
         mouth.lineCapStyle = .round
         mouth.stroke()
 
-        // 首字母小圆牌（左下角）
         let letter = String(title.prefix(1)).uppercased()
         if !letter.isEmpty {
-            let chipH = bounds.width * 0.2
+            let chipH = bounds.width * 0.18
             let attrs: [NSAttributedString.Key: Any] = [
                 .font: Theme.roundedFont(size: chipH * 0.62, weight: .heavy),
                 .foregroundColor: Theme.accent,
@@ -158,7 +186,6 @@ final class PlaceholderCoverView: UIView {
                                       withAttributes: attrs)
         }
 
-        // 不支持的游戏: 灰色纱罩
         if isDimmed {
             UIColor(white: 0.08, alpha: 0.5).setFill()
             ctx.fill(bounds)

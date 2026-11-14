@@ -95,6 +95,60 @@ fi
 
 echo "[SDL2] OK -> $BUILD_ROOT/lib/libSDL2.a"
 
+# ---------------------------------------------------------------------------
+# 3b. 安装 SDL2（供 SDL_image/ttf/mixer 的 find_package 定位）+ 构建三件套
+# ---------------------------------------------------------------------------
+cmake --install "$BUILD_DIR" --prefix "$BUILD_ROOT/prefix" >/dev/null 2>&1 || true
+
+build_sdl_ext() {
+    local name="$1"; local repo="$2"; local tags="$3"; local recurse="$4"
+    local ext_dir="$ROOT_DIR/SDL2/SDL_$name"
+    if [ ! -f "$BUILD_ROOT/lib/libSDL2_$name.a" ]; then
+        if [ ! -d "$ext_dir/.git" ]; then
+            rm -rf "$ext_dir"
+            local cloned=""
+            for t in ${tags//|/ }; do
+                echo "[SDL2] clone SDL_$name @ $t ..."
+                if [ "$recurse" = "yes" ]; then
+                    git clone --depth 1 --recurse-submodules --branch "$t" "https://github.com/$repo.git" "$ext_dir" && cloned="$t" && break
+                else
+                    git clone --depth 1 --branch "$t" "https://github.com/$repo.git" "$ext_dir" && cloned="$t" && break
+                fi
+                rm -rf "$ext_dir"
+            done
+            if [ -z "$cloned" ]; then
+                echo "[SDL2] WARNING: SDL_$name 拉取失败，跳过（影响: 图片/BGM 部分格式）"
+                return 0
+            fi
+        fi
+        local ext_build="$ROOT_DIR/build/sdl${name}-ios"
+        cmake -S "$ext_dir" -B "$ext_build" -G Ninja \
+            -DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_SYSROOT=iphoneos \
+            -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0 \
+            -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF \
+            -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
+            -DCMAKE_PREFIX_PATH="$BUILD_ROOT/prefix" \
+            -DCMAKE_INSTALL_PREFIX="$BUILD_ROOT/prefix"
+        cmake --build "$ext_build" -j "$(sysctl -n hw.ncpu)"
+        local lib=$(find "$ext_build" -name "libSDL2_$name.a" | head -n 1)
+        if [ -n "$lib" ]; then
+            cp -f "$lib" "$BUILD_ROOT/lib/libSDL2_$name.a"
+            [ -d "$ext_dir/include" ] && cp "$ext_dir"/include/*.h "$BUILD_ROOT/include/SDL2/" 2>/dev/null || true
+            cmake --install "$ext_build" --prefix "$BUILD_ROOT/prefix" >/dev/null 2>&1 || true
+            echo "[SDL2] OK -> $BUILD_ROOT/lib/libSDL2_$name.a"
+        else
+            echo "[SDL2] WARNING: SDL_$name 构建产物未找到，跳过"
+        fi
+    fi
+}
+
+# SDL_image: 内置 stb 解码器（PNG/JPG），无需外部库
+build_sdl_ext "image" "libsdl-org/SDL_image" "release-2.6.3|release-2.8.4|release-2.8.0" "no"
+# SDL_ttf: 需要 freetype 子模块（recurse）
+build_sdl_ext "ttf"   "libsdl-org/SDL_ttf"   "release-2.22.1|release-2.20.2|release-2.0.18" "yes"
+# SDL_mixer: 内置解码器（WAV/OGG/FLAC/MP3/MIDI 均为 in-tree）
+build_sdl_ext "mixer" "libsdl-org/SDL_mixer" "release-2.8.0|release-2.6.3" "no"
+
 # 记录版本
 {
     SDL_VER=$(grep -m1 "SDL_MAJOR_VERSION\|MAJOR_VERSION" "$SDL_SRC/include/SDL_version.h" 2>/dev/null || echo "unknown")

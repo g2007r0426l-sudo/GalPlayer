@@ -158,6 +158,11 @@ int SDL_Compat_SetAlpha(SDL_Surface *s, Uint32 flag, Uint8 alpha) {
 int SDL_Compat_EnableUNICODE(int)   { return 1; }
 int SDL_Compat_EnableKeyRepeat(int, int) { return 0; }
 
+int SDL_Compat_GetAppState(void) {
+    // 始终视为前台聚焦（iOS 全屏单窗口场景）
+    return SDL_APPMOUSEFOCUS | SDL_APPINPUTFOCUS | SDL_APPACTIVE;
+}
+
 SDL_VideoInfo *SDL_Compat_GetVideoInfo(void) {
     memset(&g_vinfo, 0, sizeof(g_vinfo));
     SDL_Rect r;

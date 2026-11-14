@@ -155,20 +155,23 @@ CXXFLAGS=(-std=c++14 -O2 $ARCH -fno-objc-arc \
           -DLINUX=1 -DCJK=1 -DNDEBUG $OGG_FLAGS "${INC[@]}")
 
 # 选出"入口翻译单元"（定义 main 的那个文件），其余带 main 的工具源码排除
-# 优先选 ONScripter.cpp / 含 ONScripter 的文件名，避免抓到工具程序
+# vanilla master 的入口在 onscripter_main.cpp；优先匹配已知入口名
 MAIN_TU=""
 CANDIDATES=""
 for f in "$ONS_DIR"/*.cpp; do
-    if grep -lE "int[[:space:]]+main[[:space:]]*\(" "$f" >/dev/null 2>&1; then
+    if grep -lE "(int|void)[[:space:]]+main[[:space:]]*\(" "$f" >/dev/null 2>&1; then
         CANDIDATES="$CANDIDATES $f"
         echo "[ONS] 发现含 main 的源文件: $(basename "$f")"
     fi
 done
-for pref in ONScripter.cpp onscripter.cpp ONScripterJH.cpp; do
+for pref in onscripter_main.cpp ONScripter.cpp onscripter.cpp ONScripterJH.cpp; do
     for c in $CANDIDATES; do
         if [ "$(basename "$c")" = "$pref" ]; then MAIN_TU="$c"; break 2; fi
     done
 done
+if [ -z "$MAIN_TU" ] && [ -n "$CANDIDATES" ]; then
+    MAIN_TU=$(echo $CANDIDATES | awk '{print $1}')
+fi
 if [ -z "$MAIN_TU" ] && [ -n "$CANDIDATES" ]; then
     MAIN_TU=$(echo $CANDIDATES | awk '{print $1}')
 fi
@@ -182,10 +185,16 @@ echo "[ONS] 入口 TU: $(basename "$MAIN_TU") （重命名为 ons_main）"
 OUT="$BUILD_ROOT/lib/libons.a"
 rm -f "$OUT"; mkdir -p "$WORK/obj"; rm -f "$WORK/obj"/*.o
 OBJS=()
+# 依赖外部库（avifile/lua）或属于独立工具的源码，不参与引擎编译
+SKIP_RE='^(AVIWrapper|simple_aviplay|LUAHandler)\.cpp$'
 for f in "$ONS_DIR"/*.cpp; do
     base=$(basename "$f")
     if grep -lE "int[[:space:]]+main[[:space:]]*\(" "$f" >/dev/null 2>&1 && [ "$f" != "$MAIN_TU" ]; then
         echo "[ONS] 跳过独立工具源（含 main）: $base"
+        continue
+    fi
+    if echo "$base" | grep -qE "$SKIP_RE"; then
+        echo "[ONS] 跳过外部依赖源: $base"
         continue
     fi
     o="$WORK/obj/${base%.cpp}.o"

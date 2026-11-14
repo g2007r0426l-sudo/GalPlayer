@@ -15,10 +15,15 @@ final class GlobalSettingsViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        title = "设置"
-        view.backgroundColor = Theme.background
+        title = "⚙️ 设置"
+        view.backgroundColor = .systemBackground
         buildUI()
         loadValues()
+    }
+
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        navigationController?.setNavigationBarHidden(false, animated: animated)
     }
 
     // -------------------------------------------------------------------------

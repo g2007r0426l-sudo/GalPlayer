@@ -26,9 +26,10 @@
 ## 3. SDL2 (Simple DirectMedia Layer)
 
 - 上游仓库: https://github.com/libsdl-org/SDL（构建脚本按 release-2.30.x → 2.26.x tag 列表锁定）
+- 附带扩展: SDL_image / SDL_ttf / SDL_mixer（libsdl-org 官方仓库，release tag 锁定）
 - 若 Kirikiroid2 仓库自带 SDL2 fork，构建脚本优先使用其 fork（保证渲染层一致）
 - 使用范围: iOS UIKit 后端（视频/触摸/音频/线程），两引擎统一运行时
-- 协议: **zlib**
+- 协议: **zlib**（SDL_image/SDL_ttf/SDL_mixer 同为 zlib）
 
 ## 4. FreeType
 
