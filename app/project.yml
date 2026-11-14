@@ -83,7 +83,7 @@ targets:
     platform: iOS
     sources:
       - path: ../engines/kirikiroid2/ios_host/IOSMain.mm
-        createIntermediateGroups: true
+        name: IOSMain
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.yg.kirikinux2
