@@ -27,6 +27,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <string>
+#include <vector>
 #include <thread>
 #include <chrono>
 
@@ -278,8 +279,34 @@ int GP_ONS_Entry(int argc, char **argv) {
     onsdl_set_scale_mode(0);
 
     std::string a0 = "onscripter";
-    char *av[] = { const_cast<char *>(a0.c_str()), nullptr };
-    int rc = ons_main(1, av);
+    // 字体：ONS 需要 TTF；优先用包内 CJK 字体，其次共享目录，最后回落到游戏目录 default.ttf
+    std::string fontPath;
+    {
+        NSArray *cands = @[
+            [[NSBundle mainBundle] pathForResource:@"DroidSansFallback" ofType:@"ttf"],
+            [[NSBundle mainBundle] pathForResource:@"LXGWWenKai-Regular" ofType:@"ttf"],
+            @"/var/mobile/Documents/Galgames/default.ttf"
+        ];
+        for (NSString *p in cands) {
+            if (p && [[NSFileManager defaultManager] fileExistsAtPath:p]) {
+                fontPath = [p UTF8String];
+                break;
+            }
+        }
+    }
+    std::string a1 = "-f";
+    // 若游戏目录里自带 default.ttf，就不用 -f（让引擎自取，避免覆盖作者字体）
+    std::vector<std::string> args;
+    args.push_back(a0);
+    if (!fontPath.empty() && access("default.ttf", R_OK) != 0) {
+        fprintf(stderr, "[ONSApp] font=%s\n", fontPath.c_str());
+        args.push_back(a1);
+        args.push_back(fontPath);
+    }
+    std::vector<char *> avp;
+    for (size_t i = 0; i < args.size(); ++i) avp.push_back(const_cast<char *>(args[i].c_str()));
+    avp.push_back(nullptr);
+    int rc = ons_main((int)args.size(), avp.data());
     fprintf(stderr, "[ONSApp] ons_main returned rc=%d\n", rc);
     return rc;
 }

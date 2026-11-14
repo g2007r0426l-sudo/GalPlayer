@@ -8,9 +8,13 @@ ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 FONT_DIR="$ROOT_DIR/app/GalPlayer/Resources"
 FONT="$FONT_DIR/DroidSansFallback.ttf"
 mkdir -p "$FONT_DIR"
+# 引擎侧（OnsPlayer）也需要一份：ONS 启动时若目录内无 default.ttf 会拒绝渲染文字
+ONS_FONT_DIR="$ROOT_DIR/app/OnsPlayer/Resources"
+mkdir -p "$ONS_FONT_DIR"
 
 if [ -f "$FONT" ] && [ $(stat -f%z "$FONT") -gt 1000000 ]; then
     echo "[fonts] 字体已存在: $FONT"
+    cp -f "$FONT" "$ONS_FONT_DIR/DroidSansFallback.ttf"
     exit 0
 fi
 
@@ -23,6 +27,7 @@ for u in "${URLS[@]}"; do
     echo "[fonts] 尝试: $u"
     if curl -fsSL --connect-timeout 20 -o "$FONT" "$u" && [ $(stat -f%z "$FONT") -gt 1000000 ]; then
         echo "[fonts] OK: $(ls -lh "$FONT")"
+        cp -f "$FONT" "$ONS_FONT_DIR/DroidSansFallback.ttf"
         exit 0
     fi
 done
