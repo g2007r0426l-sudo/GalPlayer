@@ -30,14 +30,14 @@ final class GlobalSettingsViewController: UIViewController {
         var y: CGFloat = 24
         let pad: CGFloat = 24
 
-        y += addHeader("屏幕适配", to: y)
+        y += addHeader("🎀 屏幕适配", to: y)
         stretchSegment.selectedSegmentTintColor = Theme.accent
         stretchSegment.setTitleTextAttributes([.foregroundColor: UIColor.white], for: .selected)
         stretchSegment.setTitleTextAttributes([.foregroundColor: Theme.textSub], for: .normal)
         stretchSegment.addTarget(self, action: #selector(stretchChanged), for: .valueChanged)
         y += addControl(stretchSegment, top: y, height: 40, note: "原始比例: 引擎画面等比缩放（居中黑边）\n拉伸全屏: 铺满整个屏幕（画面变形）", pad: pad)
 
-        y += addHeader("快进 / 文字速度", to: y)
+        y += addHeader("🍬 快进 / 文字速度", to: y)
         speedSlider.minimumValue = 0.25
         speedSlider.maximumValue = 4.0
         speedSlider.tintColor = Theme.accent
@@ -47,7 +47,7 @@ final class GlobalSettingsViewController: UIViewController {
         speedLabel.textAlignment = .right
         y += addControl(speedSlider, top: y, height: 36, note: "作用于\"长按快进\"的节奏；游戏内逐字速度请用引擎自带菜单调整", pad: pad, trailing: speedLabel)
 
-        y += addHeader("音量", to: y)
+        y += addHeader("🔊 音量", to: y)
         volumeSlider.minimumValue = 0
         volumeSlider.maximumValue = 1.0
         volumeSlider.tintColor = Theme.accent
@@ -60,7 +60,7 @@ final class GlobalSettingsViewController: UIViewController {
         about.font = .systemFont(ofSize: 12)
         about.textColor = Theme.textSub
         about.text = """
-        GalPlayer 0.1.0 — 本地视觉小说播放器（无联网 / 无账号 / 无广告）
+        🌸 GalPlayer 0.1.0 — 本地视觉小说播放器（无联网 / 无账号 / 无广告）
 
         本应用基于以下开源引擎构建，感谢上游作者：
         · Kirikiri2 / Kirikiroid2 (zzz-ooo) — GPL-2.0

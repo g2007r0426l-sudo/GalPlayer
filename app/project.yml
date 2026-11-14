@@ -37,6 +37,7 @@ settings:
       - "-lons"
       - "-lkrkr2"
       - "-lfreetype"
+      - "-lvorbisfile"
       - "-lvorbis"
       - "-logg"
       - "-liconv"

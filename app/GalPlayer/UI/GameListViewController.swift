@@ -19,7 +19,7 @@ final class GameListViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        title = "GalPlayer"
+        title = "🌸 GalPlayer"
         view.backgroundColor = Theme.background
 
         setupNavbar()
@@ -70,6 +70,18 @@ final class GameListViewController: UIViewController {
         let lp = UILongPressGestureRecognizer(target: self, action: #selector(handleLongPress(_:)))
         lp.minimumPressDuration = 0.5
         collectionView.addGestureRecognizer(lp)
+
+        // 空列表可爱引导
+        let empty = UILabel()
+        empty.numberOfLines = 0
+        empty.textAlignment = .center
+        empty.font = Theme.roundedFont(size: 15)
+        empty.textColor = Theme.textSub
+        empty.text = "🎀 这里还空空哒 🎀\n\n把游戏文件夹放进\n/var/mobile/Documents/Galgames/\n\n再点右上角 ⟳ 刷新，游戏就会出现啦～"
+        empty.frame = CGRect(x: 24, y: 0, width: view.bounds.width - 48, height: 320)
+        empty.autoresizingMask = [.flexibleWidth]
+        empty.center = CGPoint(x: view.bounds.midX, y: view.bounds.midY)
+        collectionView.backgroundView = empty
     }
 
     /// iPad 横屏 4 列，窄屏自适应降列
@@ -83,6 +95,7 @@ final class GameListViewController: UIViewController {
     private func rescan(force: Bool) {
         entries = Scanner.shared.rescan(force: force)
         collectionView.reloadData()
+        collectionView.backgroundView?.isHidden = !entries.isEmpty
     }
 
     private func showFirstRunGuideIfNeeded() {

@@ -97,30 +97,38 @@ fi
 # ---------------------------------------------------------------------------
 OGG_FLAGS=""
 OGG_LIBS=""
+OGG_INC=""
 if [ "${ONS_BUILD_OGG:-1}" = "1" ]; then
     TP="$WORK/thirdparty"
+    PREFIX="$BUILD_ROOT/prefix"
     mkdir -p "$TP"
     OGGD="$TP/libogg"; VORD="$TP/libvorbis"
     if [ ! -d "$OGGD/.git" ]; then git clone --branch v1.3.5 https://github.com/xiph/ogg.git "$OGGD" || true; fi
     if [ ! -d "$VORD/.git" ]; then git clone --branch v1.3.7 https://github.com/xiph/vorbis.git "$VORD" || true; fi
     if [ -f "$OGGD/CMakeLists.txt" ] && [ -f "$VORD/CMakeLists.txt" ]; then
+        # libogg: 编译并安装到 prefix（vorbis 的 find_package(Ogg) 需要）
         cmake -S "$OGGD" -B "$ROOT_DIR/build/ogg-ios" -G Ninja \
             -DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_SYSROOT=iphoneos -DCMAKE_OSX_ARCHITECTURES=arm64 \
             -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0 -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF \
-            -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DINSTALL_DOCS=OFF >/dev/null
+            -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DCMAKE_INSTALL_PREFIX="$PREFIX" -DINSTALL_DOCS=OFF >/dev/null
         cmake --build "$ROOT_DIR/build/ogg-ios" -j "$(sysctl -n hw.ncpu)" >/dev/null
+        cmake --install "$ROOT_DIR/build/ogg-ios" >/dev/null
+        # libvorbis: 用 CMAKE_PREFIX_PATH 指向 ogg 的安装位置
         cmake -S "$VORD" -B "$ROOT_DIR/build/vorbis-ios" -G Ninja \
             -DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_SYSROOT=iphoneos -DCMAKE_OSX_ARCHITECTURES=arm64 \
             -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0 -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DBUILD_SHARED_LIBS=OFF >/dev/null
+            -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DCMAKE_PREFIX_PATH="$PREFIX" -DBUILD_SHARED_LIBS=OFF >/dev/null
         cmake --build "$ROOT_DIR/build/vorbis-ios" -j "$(sysctl -n hw.ncpu)" >/dev/null
         OGG_LIB=$(find "$ROOT_DIR/build/ogg-ios" -name "libogg.a" | head -n1)
-        VOR_LIB=$(find "$ROOT_DIR/build/vorbis-ios" -name "libvorbis*.a" | head -n1)
+        VOR_LIB=$(find "$ROOT_DIR/build/vorbis-ios" -name "libvorbis.a" | head -n1)
+        VORF_LIB=$(find "$ROOT_DIR/build/vorbis-ios" -name "libvorbisfile.a" | head -n1)
         if [ -n "$OGG_LIB" ] && [ -n "$VOR_LIB" ]; then
             cp -f "$OGG_LIB" "$BUILD_ROOT/lib/libogg.a"
             cp -f "$VOR_LIB" "$BUILD_ROOT/lib/libvorbis.a"
+            if [ -n "$VORF_LIB" ]; then cp -f "$VORF_LIB" "$BUILD_ROOT/lib/libvorbisfile.a"; fi
             OGG_FLAGS="-DUSE_OGG_VORBIS=1"
-            OGG_LIBS="-lvorbis -logg"
+            OGG_LIBS="-lvorbisfile -lvorbis -logg"
+            OGG_INC="-I$PREFIX/include"
             echo "[ONS] OGG 支持: 开启"
         fi
     else
@@ -136,7 +144,7 @@ COMPAT_INC="$WORK/sdl2_compat"
 CC="xcrun -sdk iphoneos clang"
 CXX="xcrun -sdk iphoneos clang++"
 ARCH="-arch arm64 -miphoneos-version-min=14.0"
-INC=(-I"$COMPAT_INC" -I"$ONS_DIR" -I"$BUILD_ROOT/include" -I"$BUILD_ROOT/include/SDL2" -I"$BUILD_ROOT/include/freetype2")
+INC=(-I"$COMPAT_INC" -I"$ONS_DIR" -I"$BUILD_ROOT/include" -I"$BUILD_ROOT/include/SDL2" -I"$BUILD_ROOT/include/freetype2" $OGG_INC)
 CXXFLAGS=(-std=c++14 -O2 $ARCH -fno-objc-arc \
           -DLINUX=1 -DCJK=1 -DNDEBUG $OGG_FLAGS "${INC[@]}")
 
