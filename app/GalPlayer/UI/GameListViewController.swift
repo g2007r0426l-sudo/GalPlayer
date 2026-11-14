@@ -18,8 +18,8 @@ final class GameListViewController: UIViewController {
     private let sidebarView = UIView()
     private let sidebarTitle = UILabel()
     private let sidebarStack = UIStackView()
-    private var navButtons: [UIButton] = []
-    private let navTitles = [("square.grid.2x2", "全部游戏"), ("clock", "最近游玩"), ("gearshape.fill", "设置")]
+    private var navRows: [SidebarRow] = []
+    private let navTitles = [("square.grid.2x2.fill", "全部游戏"), ("clock.fill", "最近游玩"), ("gearshape.fill", "设置")]
 
     // ---- 内容区 ----
     private let contentWrap = UIView()
@@ -108,19 +108,11 @@ final class GameListViewController: UIViewController {
         sidebarView.addSubview(version)
 
         for (i, (icon, title)) in navTitles.enumerated() {
-            let btn = UIButton(type: .system)
-            btn.setImage(UIImage(systemName: icon)?.withRenderingMode(.alwaysTemplate), for: .normal)
-            btn.setTitle(title, for: .normal)
-            btn.titleLabel?.font = Theme.uiFont(size: 16)
-            btn.contentHorizontalAlignment = .leading
-            btn.imageEdgeInsets = UIEdgeInsets(top: 0, left: 14, bottom: 0, right: 8)
-            btn.titleEdgeInsets = UIEdgeInsets(top: 0, left: 10, bottom: 0, right: 0)
-            btn.contentEdgeInsets = UIEdgeInsets(top: 12, left: 4, bottom: 12, right: 8)
-            btn.layer.cornerRadius = 14
-            btn.tag = i
-            btn.addTarget(self, action: #selector(navTapped(_:)), for: .touchUpInside)
-            sidebarStack.addArrangedSubview(btn)
-            navButtons.append(btn)
+            let row = SidebarRow(icon: icon, title: title)
+            row.tag = i
+            row.addTarget(self, action: #selector(navTapped(_:)), for: .touchUpInside)
+            sidebarStack.addArrangedSubview(row)
+            navRows.append(row)
         }
         applySidebarSelection()
 
@@ -138,11 +130,8 @@ final class GameListViewController: UIViewController {
     }
 
     private func applySidebarSelection() {
-        for (i, btn) in navButtons.enumerated() {
-            let selected = (i == mode.rawValue)
-            btn.backgroundColor = selected ? Theme.accent : .clear
-            btn.setTitleColor(selected ? .white : Theme.textSub, for: .normal)
-            btn.tintColor = selected ? .white : Theme.textSub
+        for (i, row) in navRows.enumerated() {
+            row.isChosen = (i == mode.rawValue)
         }
     }
 
@@ -287,6 +276,25 @@ final class GameListViewController: UIViewController {
         subtitleLabel.text = "\(visible.count) 部作品"
         collectionView.backgroundView?.isHidden = !visible.isEmpty
         collectionView.reloadData()
+        updateEmptyFloatAnimation()
+    }
+
+    /// 空状态：轻轻上下浮动（没有游戏时有生气一点）
+    private func updateEmptyFloatAnimation() {
+        guard !visible.isEmpty else {
+            emptyLabel.layer.removeAnimation(forKey: "float")
+            return
+        }
+        if emptyLabel.layer.animation(forKey: "float") == nil {
+            let a = CABasicAnimation(keyPath: "transform.translation.y")
+            a.fromValue = -6
+            a.toValue = 6
+            a.duration = 2.2
+            a.autoreverses = true
+            a.repeatCount = .infinity
+            a.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            emptyLabel.layer.add(a, forKey: "float")
+        }
     }
 
     private func showFirstRunGuideIfNeeded() {
@@ -310,7 +318,7 @@ final class GameListViewController: UIViewController {
     // -------------------------------------------------------------------------
     // 动作
     // -------------------------------------------------------------------------
-    @objc private func navTapped(_ sender: UIButton) {
+    @objc private func navTapped(_ sender: UIControl) {
         if sender.tag == 2 {
             navigationController?.pushViewController(GlobalSettingsViewController(), animated: true)
             return
@@ -321,6 +329,21 @@ final class GameListViewController: UIViewController {
     }
 
     @objc private func refreshTapped() {
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        // 图标旋转动效
+        let spin = CABasicAnimation(keyPath: "transform.rotation.z")
+        spin.toValue = CGFloat.pi * 2
+        spin.duration = 0.7
+        spin.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+        refreshButton.layer.add(spin, forKey: "spin")
+        // 轻微缩放反馈
+        UIView.animate(withDuration: 0.16, animations: {
+            self.refreshButton.transform = CGAffineTransform(scaleX: 0.9, y: 0.9)
+        }) { _ in
+            UIView.animate(withDuration: 0.22, delay: 0.05, options: [.curveEaseOut]) {
+                self.refreshButton.transform = .identity
+            }
+        }
         rescan(force: true)
     }
 
@@ -412,6 +435,24 @@ extension GameListViewController: UICollectionViewDataSource, UICollectionViewDe
     func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
         let entry = indexPath.section == 0 ? visible.first : visible[indexPath.item]
         if let entry { launch(entry) }
+    }
+
+    /// 卡片入场动效：淡入 + 上浮（错峰）
+    func collectionView(_ collectionView: UICollectionView,
+                        willDisplay cell: UICollectionViewCell,
+                        forItemAt indexPath: IndexPath) {
+        if cell.tag == 1 { return } // 已播放过入场动画
+        cell.tag = 1
+        cell.alpha = 0
+        cell.transform = CGAffineTransform(translationX: 0, y: 16).scaledBy(x: 0.96, y: 0.96)
+        UIView.animate(withDuration: 0.42,
+                       delay: 0.04 * Double(min(indexPath.item, 8)),
+                       usingSpringWithDamping: 0.85,
+                       initialSpringVelocity: 0.4,
+                       options: [.curveEaseOut, .allowUserInteraction]) {
+            cell.alpha = 1
+            cell.transform = .identity
+        }
     }
 }
 
@@ -521,6 +562,7 @@ final class HeroCardCell: UICollectionViewCell {
 
     func configure(with entry: GameEntry, engine: GameEngine) {
         coverView.title = entry.name
+        coverView.coverImage = CoverArt.image(for: entry.name)
         nameLabel.text = entry.name
         metaLabel.text = "上次游玩 · \(TimeAgo.string(from: entry.dirMtime)) · \(engine.displayName)"
         chip.isHidden = !engine.playable
