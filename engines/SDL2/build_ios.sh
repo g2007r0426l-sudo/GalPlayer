@@ -166,8 +166,9 @@ build_sdl_ext() {
 # SDL_image: 关闭 ImageIO 后端（避免 CoreServices 依赖），启用内置 stb 解码器
 build_sdl_ext "image" "libsdl-org/SDL_image" "release-2.6.3|release-2.8.4|release-2.8.0" "no" \
     -DSDL2IMAGE_BACKEND_IMAGEIO=OFF -DSDL2IMAGE_BACKEND_STB=ON
-# SDL_ttf: 需要 freetype 子模块（recurse）
-build_sdl_ext "ttf"   "libsdl-org/SDL_ttf"   "release-2.22.1|release-2.20.2|release-2.0.18" "yes"
+# SDL_ttf: freetype/harfbuzz 子模块 vendored 构建（recurse clone 已就位）
+build_sdl_ext "ttf"   "libsdl-org/SDL_ttf"   "release-2.22.1|release-2.20.2|release-2.0.18" "yes" \
+    -DSDL2TTF_VENDORED=ON
 # SDL_mixer: 内置解码器（WAV/OGG/FLAC/MP3/MIDI 均为 in-tree）
 build_sdl_ext "mixer" "libsdl-org/SDL_mixer" "release-2.8.0|release-2.6.3" "no"
 
