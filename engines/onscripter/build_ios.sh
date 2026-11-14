@@ -81,7 +81,7 @@ if [ ! -f "$BUILD_ROOT/lib/libfreetype.a" ]; then
     cmake -S "$FT_DIR" -B "$FT_BUILD" -G Ninja \
         -DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_SYSROOT=iphoneos \
         -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0 \
-        -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DFT_DISABLE_ZLIB=TRUE \
+        -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DFT_DISABLE_ZLIB=TRUE \
         -DFT_DISABLE_BZIP2=TRUE -DFT_DISABLE_PNG=TRUE -DFT_DISABLE_HARFBUZZ=TRUE -DFT_DISABLE_BROTLI=TRUE
     cmake --build "$FT_BUILD" -j "$(sysctl -n hw.ncpu)"
     FT_LIB=$(find "$FT_BUILD" -name "libfreetype.a" | head -n 1)
@@ -101,18 +101,18 @@ if [ "${ONS_BUILD_OGG:-1}" = "1" ]; then
     TP="$WORK/thirdparty"
     mkdir -p "$TP"
     OGGD="$TP/libogg"; VORD="$TP/libvorbis"
-    if [ ! -d "$OGGD/.git" ]; then git clone --depth 1 --branch v1.3.5 https://github.com/xiph/ogg.git "$OGGD" || true; fi
-    if [ ! -d "$VORD/.git" ]; then git clone --depth 1 --branch v1.3.7 https://github.com/xiph/vorbis.git "$VORD" || true; fi
+    if [ ! -d "$OGGD/.git" ]; then git clone --branch v1.3.5 https://github.com/xiph/ogg.git "$OGGD" || true; fi
+    if [ ! -d "$VORD/.git" ]; then git clone --branch v1.3.7 https://github.com/xiph/vorbis.git "$VORD" || true; fi
     if [ -f "$OGGD/CMakeLists.txt" ] && [ -f "$VORD/CMakeLists.txt" ]; then
         cmake -S "$OGGD" -B "$ROOT_DIR/build/ogg-ios" -G Ninja \
             -DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_SYSROOT=iphoneos -DCMAKE_OSX_ARCHITECTURES=arm64 \
             -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0 -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF \
-            -DINSTALL_DOCS=OFF >/dev/null
+            -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DINSTALL_DOCS=OFF >/dev/null
         cmake --build "$ROOT_DIR/build/ogg-ios" -j "$(sysctl -n hw.ncpu)" >/dev/null
         cmake -S "$VORD" -B "$ROOT_DIR/build/vorbis-ios" -G Ninja \
             -DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_SYSROOT=iphoneos -DCMAKE_OSX_ARCHITECTURES=arm64 \
-            -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0 -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF \
-            -DBUILD_SHARED_LIBS=OFF >/dev/null
+            -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0 -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DBUILD_SHARED_LIBS=OFF >/dev/null
         cmake --build "$ROOT_DIR/build/vorbis-ios" -j "$(sysctl -n hw.ncpu)" >/dev/null
         OGG_LIB=$(find "$ROOT_DIR/build/ogg-ios" -name "libogg.a" | head -n1)
         VOR_LIB=$(find "$ROOT_DIR/build/vorbis-ios" -name "libvorbis*.a" | head -n1)
