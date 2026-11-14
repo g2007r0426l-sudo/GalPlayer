@@ -26,9 +26,8 @@ jobs:
         run: |
           brew install cmake ninja xcodegen ldid dpkg
 
-      # ---- 依赖缓存：引擎源码 + 已编译库（大幅缩短每轮迭代时间） ----
-      - name: 缓存引擎源码与产物
-        id: cache-engines
+      # ---- 缓存：仅缓存第三方源码（不缓存 build 产物，避免恢复耗时与状态不一致） ----
+      - name: 缓存第三方源码
         uses: actions/cache@v4
         with:
           path: |
@@ -36,13 +35,10 @@ jobs:
             engines/SDL2/SDL_image
             engines/SDL2/SDL_ttf
             engines/SDL2/SDL_mixer
-            engines/onscripter/src
             engines/onscripter/thirdparty
-            engines/kirikiroid2/Kirikinux2
-            build/ios
-          key: engines-${{ hashFiles('engines/**/*.sh', 'engines/**/*.py', 'engines/**/*.h', 'engines/**/*.cpp', 'engines/**/*.mm') }}
+          key: deps-${{ hashFiles('engines/**/*.sh') }}
           restore-keys: |
-            engines-
+            deps-
 
       - name: 一键全量构建（字体→SDL2→ONScripter→Kirikiri→App→.deb）
         env:
