@@ -279,7 +279,6 @@ int GP_ONS_Entry(int argc, char **argv) {
     onsdl_set_scale_mode(0);
 
     std::string a0 = "onscripter";
-    // 字体：ONS 需要 TTF；优先用包内 CJK 字体，其次共享目录，最后回落到游戏目录 default.ttf
     std::string fontPath;
     {
         // 注意: @[...] 字面量禁止 nil 元素，必须逐个判空后 addObject
@@ -309,5 +308,18 @@ int GP_ONS_Entry(int argc, char **argv) {
     avp.push_back(nullptr);
     int rc = ons_main((int)args.size(), avp.data());
     fprintf(stderr, "[ONSApp] ons_main returned rc=%d\n", rc);
+
+    // 退出游戏后自动回到 GalPlayer 游戏库
+    @autoreleasepool {
+        Class wsCls = NSClassFromString(@"LSApplicationWorkspace");
+        if (wsCls) {
+            id ws = [wsCls performSelector:NSSelectorFromString(@"defaultWorkspace")];
+            if (ws) {
+                [ws performSelector:NSSelectorFromString(@"openApplicationWithBundleID:")
+                         withObject:@"com.yg.galplayer"];
+                fprintf(stderr, "[ONSApp] back to GalPlayer\n");
+            }
+        }
+    }
     return rc;
 }
