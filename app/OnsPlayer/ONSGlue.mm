@@ -1,11 +1,18 @@
 // =============================================================================
-// ONSGlue.mm - ONScripter standalone player glue
-//   1. read marker file /var/mobile/Documents/Galgames/.ons_launch (line 1 = game dir)
-//   2. chdir into game dir (saves land inside game dir)
-//   3. install unified touch mapping (tap = left click, 2-finger = right click, long press = skip)
-//   4. call engine entry ons_main (renamed at build time with -Dmain=ons_main)
+// ONSGlue.mm - ONScripter standalone player glue (GPU-free presentation)
 //
-// NOTE: all log strings are ASCII on purpose - keeps the file encoding-safe.
+// WHY: on this jailbroken environment MTLCreateSystemDefaultDevice() returns nil
+// and GL ES contexts cannot be created, so SDL's metal/opengles/software
+// renderers all fail. CoreAnimation compositing still works (system-side), so we
+// present engine frames by assigning CGImage to layer.contents - zero GPU client
+// access needed.
+//
+// Flow:
+//   1. read marker /var/mobile/Documents/Galgames/.ons_launch  (line 1 = game dir)
+//   2. chdir into game dir
+//   3. create UIWindow + frame view, register presenter with the compat layer
+//   4. touches -> synthesized SDL mouse events (tap=advance, 2-finger=menu, hold=skip)
+//   5. call ons_main(1, argv)   (no bare-dir argument: ONS would optionHelp()+exit)
 // =============================================================================
 #import <UIKit/UIKit.h>
 #import <Metal/Metal.h>
@@ -19,172 +26,220 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
-#include <map>
-#include <mutex>
 #include <string>
 #include <thread>
 #include <chrono>
 
 int ons_main(int argc, char **argv);
 extern "C" void onsdl_set_scale_mode(int stretch);
+extern "C" void onsdl_set_presenter(void (*fn)(const void *pixels, int w, int h, int pitch));
+extern "C" unsigned int onsdl_window_id(void);
 
 static const char *K_MARKER = "/var/mobile/Documents/Galgames/.ons_launch";
+static const Uint32 LONG_PRESS_MS = 450;
 
-// ============================ touch mapping ================================
-static const Uint32 LONG_PRESS_MS  = 450;
-static const Uint32 TWO_FINGER_MAX = 400;
-static const float  MOVE_EPS       = 0.02f;
+// ---------------------------------------------------------------------------
+// runtime state shared with the presenter / touch code
+// ---------------------------------------------------------------------------
+static int    gGameW = 640, gGameH = 480;
+static UIView *gFrameView = nil;
+static UIWindow *gWindow = nil;
+static volatile bool gSkipMode = false;
+static bool   gSingleDown = false;
+static CGPoint gLastPoint = CGPointMake(0, 0);
 
-struct FingerInfo { float x, y; Uint32 t0; bool moved; };
-static std::map<SDL_FingerID, FingerInfo> g_fingers;
-static std::mutex g_mtx;
-static bool   g_leftDown = false;
-static bool   g_skip = false;
-static bool   g_pendingRight = false;
-static Uint32 g_twoT0 = 0;
-static Uint32 g_lastClick = 0;
-static bool   g_monitorRun = false;
-static std::thread *g_monitor = nullptr;  // heap: avoid joinable-thread terminate on exit()
-
-static SDL_Window *engineWindow() { return SDL_GetWindowFromID(1); }
-
-static void pushMotion(float nx, float ny) {
-    SDL_Window *w = engineWindow(); if (!w) return;
-    int ww = 0, wh = 0; SDL_GetWindowSize(w, &ww, &wh);
-    if (ww <= 0 || wh <= 0) return;
+// ---------------------------------------------------------------------------
+// SDL event synthesis (works even if SDL never created a renderer)
+// ---------------------------------------------------------------------------
+static void pushMouse(Uint32 type, Uint8 button, Sint32 x, Sint32 y) {
     SDL_Event ev; SDL_zero(ev);
-    ev.motion.type = SDL_MOUSEMOTION;
-    ev.motion.windowID = SDL_GetWindowID(w);
-    ev.motion.x = (Sint32)(nx * ww); ev.motion.y = (Sint32)(ny * wh);
-    SDL_PushEvent(&ev);
-}
-
-static void pushButton(bool down, Uint8 button, float nx, float ny) {
-    SDL_Window *w = engineWindow(); if (!w) return;
-    int ww = 0, wh = 0; SDL_GetWindowSize(w, &ww, &wh);
-    if (ww <= 0 || wh <= 0) return;
-    SDL_Event ev; SDL_zero(ev);
-    ev.button.type = down ? SDL_MOUSEBUTTONDOWN : SDL_MOUSEBUTTONUP;
-    ev.button.windowID = SDL_GetWindowID(w);
-    ev.button.button = button;
-    ev.button.state = down ? SDL_PRESSED : SDL_RELEASED;
-    ev.button.clicks = 1;
-    ev.button.x = (Sint32)(nx * ww); ev.button.y = (Sint32)(ny * wh);
+    if (type == SDL_MOUSEMOTION) {
+        ev.motion.type = SDL_MOUSEMOTION;
+        ev.motion.x = x; ev.motion.y = y;
+        ev.motion.windowID = onsdl_window_id();
+    } else {
+        ev.button.type = type;
+        ev.button.button = button;
+        ev.button.state = (type == SDL_MOUSEBUTTONDOWN) ? SDL_PRESSED : SDL_RELEASED;
+        ev.button.clicks = 1;
+        ev.button.x = x; ev.button.y = y;
+        ev.button.windowID = onsdl_window_id();
+    }
     SDL_PushEvent(&ev);
 }
 
 static void pushCtrl(bool down) {
-    SDL_Window *w = engineWindow(); if (!w) return;
     SDL_Event ev; SDL_zero(ev);
     ev.key.type = down ? SDL_KEYDOWN : SDL_KEYUP;
-    ev.key.windowID = SDL_GetWindowID(w);
     ev.key.state = down ? SDL_PRESSED : SDL_RELEASED;
     ev.key.keysym.sym = SDLK_LCTRL;
+    ev.key.windowID = onsdl_window_id();
     SDL_PushEvent(&ev);
 }
 
-static void stopSkipLocked() {
-    if (g_skip) { pushCtrl(false); g_skip = false; }
+// view point -> game pixel coordinates (aspect-fit letterbox)
+static void gamePoint(CGPoint p, Sint32 *ox, Sint32 *oy) {
+    CGFloat vw = gFrameView ? gFrameView.bounds.size.width  : 1;
+    CGFloat vh = gFrameView ? gFrameView.bounds.size.height : 1;
+    if (vw < 1) vw = 1;
+    if (vh < 1) vh = 1;
+    CGFloat scale = MIN(vw / gGameW, vh / gGameH);
+    CGFloat cw = gGameW * scale, ch = gGameH * scale;
+    CGFloat left = (vw - cw) / 2, top = (vh - ch) / 2;
+    CGFloat gx = (p.x - left) / cw * gGameW;
+    CGFloat gy = (p.y - top)  / ch * gGameH;
+    if (gx < 0) gx = 0; if (gx >= gGameW) gx = gGameW - 1;
+    if (gy < 0) gy = 0; if (gy >= gGameH) gy = gGameH - 1;
+    *ox = (Sint32)gx; *oy = (Sint32)gy;
 }
 
-static void monitorLoop() {
-    while (g_monitorRun) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(20));
-        std::lock_guard<std::mutex> lk(g_mtx);
-        Uint32 now = SDL_GetTicks();
-        if (g_fingers.size() == 1 && g_leftDown) {
-            FingerInfo &f = g_fingers.begin()->second;
-            Uint32 held = now - f.t0;
-            if (!g_skip && held >= LONG_PRESS_MS) {
-                pushButton(false, SDL_BUTTON_LEFT, f.x, f.y);
-                g_leftDown = false;
-                pushCtrl(true);
-                g_skip = true;
-                g_lastClick = now;
+// ---------------------------------------------------------------------------
+// presenter: engine pixels -> CALayer.contents (system compositor, no GPU client)
+// ---------------------------------------------------------------------------
+static void present_pixels(const void *px, int w, int h, int pitch) {
+    if (!px || w <= 0 || h <= 0) return;
+    @autoreleasepool {
+        gGameW = w; gGameH = h;
+        CGColorSpaceRef cs = CGColorSpaceCreateDeviceRGB();
+        // ONS 使用 ARGB8888；小端内存布局 = BGRA -> kCGImageAlphaPremultipliedFirst|32Little
+        CGContextRef ctx = CGBitmapContextCreate((void *)px, (size_t)w, (size_t)h, 8,
+                                                 (size_t)pitch, cs,
+                                                 kCGImageAlphaPremultipliedFirst | kCGBitmapByteOrder32Little);
+        if (ctx) {
+            CGImageRef img = CGBitmapContextCreateImage(ctx);
+            if (img) {
+                gFrameView.layer.contents = (__bridge id)img;
+                CGImageRelease(img);
             }
-            if (g_skip && (now - g_lastClick) >= 160) {
-                pushButton(true,  SDL_BUTTON_LEFT, f.x, f.y);
-                pushButton(false, SDL_BUTTON_LEFT, f.x, f.y);
-                g_lastClick = now;
-            }
+            CGContextRelease(ctx);
         }
+        CGColorSpaceRelease(cs);
     }
 }
 
-static int touchWatch(void *, SDL_Event *e) {
-    switch (e->type) {
-    case SDL_FINGERDOWN: {
-        std::lock_guard<std::mutex> lk(g_mtx);
-        SDL_FingerID fid = e->tfinger.fingerId;
-        float x = e->tfinger.x, y = e->tfinger.y;
-        if (g_fingers.empty()) {
-            g_fingers[fid] = FingerInfo{x, y, SDL_GetTicks(), false};
-            pushMotion(x, y);
-            pushButton(true, SDL_BUTTON_LEFT, x, y);
-            g_leftDown = true;
-        } else if (g_fingers.size() == 1) {
-            std::map<SDL_FingerID, FingerInfo>::iterator it = g_fingers.begin();
-            pushButton(false, SDL_BUTTON_LEFT, it->second.x, it->second.y);
-            g_leftDown = false;
-            stopSkipLocked();
-            g_fingers[fid] = FingerInfo{x, y, SDL_GetTicks(), false};
-            g_twoT0 = SDL_GetTicks();
-            g_pendingRight = true;
-        } else {
-            g_fingers[fid] = FingerInfo{x, y, SDL_GetTicks(), false};
-        }
-        break;
+// ---------------------------------------------------------------------------
+// frame view with touch handling
+// ---------------------------------------------------------------------------
+@interface ONSFrameView : UIView
+@end
+
+@implementation ONSFrameView
+
+- (instancetype)initWithFrame:(CGRect)frame {
+    self = [super initWithFrame:frame];
+    if (self) {
+        self.backgroundColor = [UIColor blackColor];
+        self.multipleTouchEnabled = YES;
+        self.layer.contentsGravity = kCAGravityResizeAspect;
+        self.layer.magnificationFilter = kCAFilterLinear;
+        self.layer.minificationFilter = kCAFilterLinear;
     }
-    case SDL_FINGERMOTION: {
-        std::lock_guard<std::mutex> lk(g_mtx);
-        std::map<SDL_FingerID, FingerInfo>::iterator it = g_fingers.find(e->tfinger.fingerId);
-        if (it == g_fingers.end()) break;
-        float x = e->tfinger.x, y = e->tfinger.y;
-        float dx = x - it->second.x, dy = y - it->second.y;
-        if (dx > MOVE_EPS || dx < -MOVE_EPS || dy > MOVE_EPS || dy < -MOVE_EPS) it->second.moved = true;
-        it->second.x = x; it->second.y = y;
-        if (g_fingers.size() == 1 && g_leftDown) pushMotion(x, y);
-        break;
-    }
-    case SDL_FINGERUP: {
-        std::lock_guard<std::mutex> lk(g_mtx);
-        std::map<SDL_FingerID, FingerInfo>::iterator it = g_fingers.find(e->tfinger.fingerId);
-        if (it == g_fingers.end()) break;
-        FingerInfo f = it->second;
-        g_fingers.erase(it);
-        Uint32 now = SDL_GetTicks();
-        if (g_fingers.empty()) {
-            if (g_pendingRight && (now - g_twoT0) <= TWO_FINGER_MAX && !f.moved) {
-                pushButton(true,  SDL_BUTTON_RIGHT, f.x, f.y);
-                pushButton(false, SDL_BUTTON_RIGHT, f.x, f.y);
-            } else {
-                stopSkipLocked();
-                if (g_leftDown) pushButton(false, SDL_BUTTON_LEFT, f.x, f.y);
-            }
-            g_leftDown = false;
-            g_pendingRight = false;
-        } else if (g_fingers.size() == 1 && g_pendingRight) {
-            g_pendingRight = false;
-        }
-        break;
-    }
-    default: break;
-    }
-    return 1;
+    return self;
 }
 
-// ============================ entry ========================================
+- (void)touchesBegan:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
+    NSInteger n = touches.count;
+    UITouch *t = touches.anyObject;
+    Sint32 gx, gy; gamePoint([t locationInView:self], &gx, &gy);
+    gLastPoint = [t locationInView:self];
+
+    if (n >= 2) {
+        // two-finger: cancel single click, then right click on release
+        if (gSingleDown) { pushMouse(SDL_MOUSEBUTTONUP, SDL_BUTTON_LEFT, gx, gy); gSingleDown = false; }
+        if (gSkipMode) { pushCtrl(false); gSkipMode = false; }
+        return;
+    }
+    pushMouse(SDL_MOUSEMOTION, 0, gx, gy);
+    pushMouse(SDL_MOUSEBUTTONDOWN, SDL_BUTTON_LEFT, gx, gy);
+    gSingleDown = true;
+
+    // long press -> skip mode (hold ctrl + auto clicks)
+    __weak UIView *weakSelf = self;
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(LONG_PRESS_MS * NSEC_PER_MSEC)),
+                   dispatch_get_main_queue(), ^{
+        if (!gSingleDown || gSkipMode || weakSelf == nil) return;
+        Sint32 x, y; gamePoint(gLastPoint, &x, &y);
+        pushMouse(SDL_MOUSEBUTTONUP, SDL_BUTTON_LEFT, x, y);
+        gSingleDown = false;
+        pushCtrl(true);
+        gSkipMode = true;
+        [self skipTick];
+    });
+}
+
+- (void)skipTick {
+    if (!gSkipMode) return;
+    Sint32 x, y; gamePoint(gLastPoint, &x, &y);
+    pushMouse(SDL_MOUSEBUTTONDOWN, SDL_BUTTON_LEFT, x, y);
+    pushMouse(SDL_MOUSEBUTTONUP, SDL_BUTTON_LEFT, x, y);
+    __weak ONSFrameView *weakSelf = self;
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(160 * NSEC_PER_MSEC)),
+                   dispatch_get_main_queue(), ^{ [weakSelf skipTick]; });
+}
+
+- (void)touchesMoved:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
+    UITouch *t = touches.anyObject;
+    CGPoint p = [t locationInView:self];
+    gLastPoint = p;
+    Sint32 gx, gy; gamePoint(p, &gx, &gy);
+    if (gSingleDown) pushMouse(SDL_MOUSEMOTION, 0, gx, gy);
+}
+
+- (void)touchesEnded:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
+    UITouch *t = touches.anyObject;
+    Sint32 gx, gy; gamePoint([t locationInView:self], &gx, &gy);
+    if (gSkipMode) { pushCtrl(false); gSkipMode = false; return; }
+    if (gSingleDown) {
+        pushMouse(SDL_MOUSEBUTTONUP, SDL_BUTTON_LEFT, gx, gy);
+        gSingleDown = false;
+    } else if (event.allTouches.count == 0) {
+        // two-finger tap ended -> right click (menu)
+        pushMouse(SDL_MOUSEBUTTONDOWN, SDL_BUTTON_RIGHT, gx, gy);
+        pushMouse(SDL_MOUSEBUTTONUP, SDL_BUTTON_RIGHT, gx, gy);
+    }
+}
+
+- (void)touchesCancelled:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
+    if (gSkipMode) { pushCtrl(false); gSkipMode = false; }
+    if (gSingleDown) { gSingleDown = false; }
+}
+
+@end
+
+// ---------------------------------------------------------------------------
+static void setupUIKit(void) {
+    void (^build)(void) = ^{
+        if (gWindow) return;
+        UIWindow *win = [[UIWindow alloc] initWithFrame:[UIScreen mainScreen].bounds];
+        ONSFrameView *view = [[ONSFrameView alloc] initWithFrame:win.bounds];
+        view.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+        UIViewController *vc = [[UIViewController alloc] init];
+        vc.view.backgroundColor = [UIColor blackColor];
+        [vc.view addSubview:view];
+        win.rootViewController = vc;
+        win.backgroundColor = [UIColor blackColor];
+        // SDL 自己的窗口会随后创建；把我们的窗口抬到更高层级，保证画面与触摸都由我们接管
+        win.windowLevel = UIWindowLevelStatusBar + 1.0;
+        [win makeKeyAndVisible];
+        gWindow = win;
+        gFrameView = view;
+        fprintf(stderr, "[ONSApp] UIKit window ready %.0fx%.0f\n",
+                (double)win.bounds.size.width, (double)win.bounds.size.height);
+    };
+    if ([NSThread isMainThread]) build();
+    else dispatch_sync(dispatch_get_main_queue(), build);
+}
+
+// ---------------------------------------------------------------------------
 int GP_ONS_Entry(int argc, char **argv) {
-    // 0. runtime log (stderr is not visible in iOS syslog for apps)
     if (FILE *lf = fopen("/var/mobile/Documents/ons_runtime.log", "w")) {
-        dup2(fileno(lf), 1);
-        dup2(fileno(lf), 2);
+        dup2(fileno(lf), 1); dup2(fileno(lf), 2);
         setvbuf(stdout, nullptr, _IONBF, 0);
         setvbuf(stderr, nullptr, _IONBF, 0);
     }
     fprintf(stderr, "[ONSApp] start argc=%d\n", argc);
 
-    // 1. marker
+    // marker
     std::string gameDir;
     if (FILE *fp = fopen(K_MARKER, "r")) {
         char line[1024];
@@ -198,7 +253,6 @@ int GP_ONS_Entry(int argc, char **argv) {
     }
     if (gameDir.empty()) gameDir = "/var/mobile/Documents/Galgames";
     fprintf(stderr, "[ONSApp] gameDir=%s\n", gameDir.c_str());
-
     if (::chdir(gameDir.c_str()) != 0)
         fprintf(stderr, "[ONSApp] chdir failed errno=%d\n", errno);
     char cwd[1024] = {0};
@@ -209,39 +263,23 @@ int GP_ONS_Entry(int argc, char **argv) {
         if (access(scripts[i], R_OK) == 0)
             fprintf(stderr, "[ONSApp] script found: %s\n", scripts[i]);
 
-    // 2. GPU / environment probe
-    @autoreleasepool {
+    {
         id<MTLDevice> dev = MTLCreateSystemDefaultDevice();
         fprintf(stderr, "[ONSApp] probe MTLDevice=%s\n", dev ? "OK" : "nil");
-        UIScreen *scr = [UIScreen mainScreen];
-        CGRect b = scr ? scr.bounds : CGRectZero;
-        fprintf(stderr, "[ONSApp] probe screen=%.0fx%.0f scale=%.1f\n",
-                (double)b.size.width, (double)b.size.height, scr ? (double)scr.scale : 0.0);
-        const char *drv = SDL_GetCurrentVideoDriver();
-        fprintf(stderr, "[ONSApp] probe videoDriver=%s\n", drv ? drv : "(null)");
     }
 
-    // 3. SDL hints + touch bridge
+    // UIKit presentation (GPU-free) + compat hooks
+    setupUIKit();
+    onsdl_set_presenter(present_pixels);
+
     SDL_SetHint(SDL_HINT_ORIENTATIONS, "LandscapeLeft LandscapeRight");
     SDL_SetHint(SDL_HINT_TOUCH_MOUSE_EVENTS, "0");
     SDL_SetHint(SDL_HINT_MOUSE_TOUCH_EVENTS, "0");
-    SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "1");
     onsdl_set_scale_mode(0);
 
-    SDL_AddEventWatch(touchWatch, nullptr);
-    g_monitorRun = true;
-    g_monitor = new std::thread(monitorLoop);
-    g_monitor->detach();
-
-    // 4. engine main loop
-    //    ONScripter only accepts '-' options; a bare directory arg triggers optionHelp()+exit().
-    //    We already chdir'ed into the game dir, so pass no arguments.
     std::string a0 = "onscripter";
     char *av[] = { const_cast<char *>(a0.c_str()), nullptr };
     int rc = ons_main(1, av);
     fprintf(stderr, "[ONSApp] ons_main returned rc=%d\n", rc);
-
-    g_monitorRun = false;
-    SDL_DelEventWatch(touchWatch, nullptr);
     return rc;
 }

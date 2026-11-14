@@ -22,6 +22,10 @@ extern "C" {
 // ---- 状态 ----
 static SDL_Window   *g_window   = nullptr;
 static SDL_Renderer *g_renderer = nullptr;
+
+// UIKit presenter 回退（GPU 不可用时由宿主 App 负责上屏）
+static ONSDPresentFn g_present = nullptr;
+static bool          g_usePresenter = false;
 static SDL_Texture  *g_texture  = nullptr;
 static SDL_Surface  *g_screen   = nullptr;
 static int   g_stretch = 0;       // 0=原始比例 1=拉伸全屏
@@ -101,8 +105,15 @@ SDL_Surface *SDL_Compat_SetVideoMode(int w, int h, int bpp, Uint32 flags) {
             fprintf(stderr, "[onsdl] index=%d 尝试失败: %s\n", tries[t], SDL_GetError());
         }
         if (!g_renderer) {
-            fprintf(stderr, "[onsdl] CreateRenderer failed: %s\n", SDL_GetError());
-            return nullptr;
+            // GPU 不可用（实测某些越狱环境下 MTLDevice=nil / GLES 建不起来）
+            // -> 退到 UIKit presenter：宿主 App 直接把像素塞进 CALayer.contents
+            if (g_present) {
+                g_usePresenter = true;
+                fprintf(stderr, "[onsdl] 无可用 GPU 渲染器，改用 UIKit presenter 呈现\n");
+            } else {
+                fprintf(stderr, "[onsdl] CreateRenderer failed: %s\n", SDL_GetError());
+                return nullptr;
+            }
         }
     }
 
@@ -115,14 +126,23 @@ SDL_Surface *SDL_Compat_SetVideoMode(int w, int h, int bpp, Uint32 flags) {
     SDL_SetRenderDrawColor(g_renderer, 0, 0, 0, 255);
 
     // 重建纹理与画面 surface
-    if (g_texture) SDL_DestroyTexture(g_texture);
-    if (g_screen)  SDL_FreeSurface(g_screen);
-    g_texture = SDL_CreateTexture(g_renderer, SDL_PIXELFORMAT_ARGB8888,
-                                  SDL_TEXTUREACCESS_STREAMING, w, h);
-    g_screen  = SDL_CreateRGBSurfaceWithFormat(0, w, h, 32, SDL_PIXELFORMAT_ARGB8888);
-    if (!g_texture || !g_screen) {
-        fprintf(stderr, "[onsdl] texture/surface create failed: %s\n", SDL_GetError());
-        return nullptr;
+    if (!g_usePresenter) {
+        if (g_texture) SDL_DestroyTexture(g_texture);
+        if (g_screen)  SDL_FreeSurface(g_screen);
+        g_texture = SDL_CreateTexture(g_renderer, SDL_PIXELFORMAT_ARGB8888,
+                                      SDL_TEXTUREACCESS_STREAMING, w, h);
+        g_screen  = SDL_CreateRGBSurfaceWithFormat(0, w, h, 32, SDL_PIXELFORMAT_ARGB8888);
+        if (!g_texture || !g_screen) {
+            fprintf(stderr, "[onsdl] texture/surface create failed: %s\n", SDL_GetError());
+            return nullptr;
+        }
+    } else {
+        if (g_screen) SDL_FreeSurface(g_screen);
+        g_screen = SDL_CreateRGBSurfaceWithFormat(0, w, h, 32, SDL_PIXELFORMAT_ARGB8888);
+        if (!g_screen) {
+            fprintf(stderr, "[onsdl] surface create failed: %s\n", SDL_GetError());
+            return nullptr;
+        }
     }
     g_w = w; g_h = h;
 
@@ -134,11 +154,25 @@ SDL_Surface *SDL_Compat_SetVideoMode(int w, int h, int bpp, Uint32 flags) {
 SDL_Surface *SDL_Compat_GetVideoSurface(void) { return g_screen; }
 
 static void present_frame() {
-    if (!g_texture || !g_renderer || !g_screen) return;
+    if (!g_screen) return;
+    if (g_usePresenter) {
+        if (g_present) g_present(g_screen->pixels, g_w, g_h, g_screen->pitch);
+        return;
+    }
+    if (!g_texture || !g_renderer) return;
     SDL_UpdateTexture(g_texture, nullptr, g_screen->pixels, g_screen->pitch);
     SDL_RenderClear(g_renderer);
     SDL_RenderCopy(g_renderer, g_texture, nullptr, nullptr);
     SDL_RenderPresent(g_renderer);
+}
+
+extern "C" void onsdl_set_presenter(ONSDPresentFn fn) {
+    g_present = fn;
+    fprintf(stderr, "[onsdl] presenter %s\n", fn ? "installed" : "cleared");
+}
+
+extern "C" unsigned int onsdl_window_id(void) {
+    return g_window ? (unsigned int)SDL_GetWindowID(g_window) : 0u;
 }
 
 int SDL_Compat_Flip(SDL_Surface *s) {
