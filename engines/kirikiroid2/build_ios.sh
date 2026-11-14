@@ -1,18 +1,18 @@
 #!/usr/bin/env bash
 # =============================================================================
-# GalPlayer - Kirikiroid2 (Kirikiri2 核心) for iOS arm64 -> libkrkr2.a
+# GalPlayer - Kirikinux2 (Kirikiroid2 引擎的 Linux/SDL2 移植) → iOS 构建脚本 v2
 #
-# 策略:
-#   1. clone 上游仓库（构建时锁定实际 commit，写入 THIRD_PARTY_RESOLVED.md）
-#   2. doctor 模式打印目录结构，确认布局
-#   3. 自动探测:
-#      - 入口 main() 所在翻译单元 -> -Dmain=krkr_entry 重命名
-#      - 排除 Windows/Android 等平台目录，只编译 kirikiri2 核心
-#      - 收集仓库内全部含头文件目录作为 -I（kirikiri 头文件布局扁平分散）
-#   4. 任何一步失败都打印修复指引，不静默出错
+# 方案: 以 Comet387/Kirikinux2 为基底（Kirikiroid2 引擎 + Linux 平台层 + CMake），
+#       注入 platform/ios 宿主（ios_host/），用 iOS 工具链编译为静态库集合。
+#       App 目标 Kirikinux2（com.yg.kirikinux2）由 xcodegen 双目标工程承载。
+#
+# 产物:
+#   build/ios/lib/libkrkr2core.a / libkrkr2plugin.a / libkrkr2plugin_ext.a / libcocos2d.a
+#   build/krkr-resources/   （引擎自带 UI 的 Resources，打包进 Kirikinux2.app）
 #
 # 环境变量:
-#   KRKR_SRC_DIR   手动指定已 clone 的仓库路径
+#   KX_SRC_DIR   手动指定 Kirikinux2 源码树
+#   KR2_SKIP_BUILD=1   只准备源码不编译（调试用）
 # =============================================================================
 set -euo pipefail
 
@@ -20,113 +20,111 @@ ENGINES_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 ROOT_DIR="$(cd "$ENGINES_DIR/.." && pwd)"
 BUILD_ROOT="$ROOT_DIR/build/ios"
 WORK="$ENGINES_DIR/kirikiroid2"
-KRKR_SRC="${KRKR_SRC_DIR:-$WORK/Kirikiroid2}"
+KX_SRC="${KX_SRC_DIR:-$WORK/Kirikinux2}"
+TP="$KX_SRC/third_party"
+IOS_HOST="$WORK/ios_host"
+KRKR_BUILD="$ROOT_DIR/build/krkr-ios"
 mkdir -p "$BUILD_ROOT/lib"
 
 # ---------------------------------------------------------------------------
-# 1. 拉取源码
+# 0. macOS sha256sum 兼容垫片（fetch-thirdparty.sh 需要 GNU sha256sum）
 # ---------------------------------------------------------------------------
-if [ ! -d "$KRKR_SRC/.git" ]; then
-    rm -rf "$KRKR_SRC"
-    echo "[KRKR] clone Kirikiroid2 ..."
-    git clone --depth 1 https://github.com/zeas2/Kirikiroid2.git "$KRKR_SRC" \
-      || git clone --depth 1 https://github.com/kirikiroid2/kirikiroid2.git "$KRKR_SRC" \
-      || { echo "[KRKR] ERROR: clone 失败。手动方案:"
-           echo "  git clone https://github.com/zeas2/Kirikiroid2.git '$KRKR_SRC' 后重跑"; exit 1; }
+SHIM="$WORK/shim"
+mkdir -p "$SHIM"
+cat > "$SHIM/sha256sum" <<'EOF'
+#!/bin/bash
+# GNU sha256sum 兼容: 支持 -c --status 与无参数输出
+if [ "$1" = "-c" ]; then
+    shift; [ "${1:-}" = "--status" ] && shift
+    exec shasum -a 256 -c --status "$@" 2>/dev/null || shasum -a 256 -c "$@"
 fi
-COMMIT=$(git -C "$KRKR_SRC" rev-parse HEAD)
-echo "[KRKR] 源码: $KRKR_SRC @ ${COMMIT:0:12}"
+exec shasum -a 256 "$@"
+EOF
+chmod +x "$SHIM/sha256sum"
+export PATH="$SHIM:$PATH"
 
 # ---------------------------------------------------------------------------
-# 2. doctor —— 打印布局，供排错
+# 1. Kirikinux2 源码树
 # ---------------------------------------------------------------------------
-echo "[KRKR] ---- 顶层目录 ----"
-ls -1 "$KRKR_SRC" | sed 's/^/  /'
-if [ -d "$KRKR_SRC/SDL2" ]; then
-    echo "[KRKR] 检测到自带 SDL2 fork: $KRKR_SRC/SDL2 （engines/SDL2/build_ios.sh 会优先使用它）"
+if [ ! -d "$KX_SRC/.git" ]; then
+    rm -rf "$KX_SRC"
+    echo "[KRKR] clone Kirikinux2 ..."
+    git clone --depth 1 https://github.com/Comet387/Kirikinux2.git "$KX_SRC" \
+      || { echo "[KRKR] ERROR: clone 失败，手动: git clone https://github.com/Comet387/Kirikinux2.git '$KX_SRC'"; exit 1; }
 fi
+KX_COMMIT=$(git -C "$KX_SRC" rev-parse HEAD)
+echo "[KRKR] Kirikinux2 @ ${KX_COMMIT:0:12}"
 
 # ---------------------------------------------------------------------------
-# 3. 收集编译范围
-#    排除明确不可用的平台目录；Kirikiroid2 的 Android 胶水层在 project/ 下，
-#    桌面 Win32 代码在含 windows.h 的目录，均排除。
+# 2. 第三方依赖（cocos2d-x 3.17.2 + external + p7zip；blend2d/unrar 可选）
+#    fetch-thirdparty.sh 在 macOS 下个别环节可能失败（unrar 源站等），容错继续
 # ---------------------------------------------------------------------------
-EXCLUDE_PAT="(windows|win32|project/jni|/jni/|android|_win|wii|psp|darwin)"
-
-# 3a. 头文件 include 目录
-INC_DIRS=$(mktemp)
-find "$KRKR_SRC" -type f \( -name '*.h' -o -name '*.hpp' \) -exec dirname {} \; | sort -u | while read -r d; do
-    case "$d" in *$EXCLUDE_PAT*) continue;; esac
-    echo "$d" >> "$INC_DIRS"
-done
-INCS=()
-while read -r d; do INCS+=("-I$d"); done < "$INC_DIRS"
-echo "[KRKR] include 目录数: ${#INCS[@]}"
-
-# 自带 SDL2 fork 头文件也要能被核心找到
-[ -d "$KRKR_SRC/SDL2/include" ] && INCS+=("-I$KRKR_SRC/SDL2/include")
-# 本地 SDL2 / freetype 头
-INCS+=("-I$BUILD_ROOT/include" "-I$BUILD_ROOT/include/SDL2" "-I$BUILD_ROOT/include/freetype2")
-
-# 3b. 源文件
-SRCS=()
-while IFS= read -r f; do SRCS+=("$f"); done < <(find "$KRKR_SRC" -type f -name '*.cpp' | grep -vE "$EXCLUDE_PAT" | sort)
-echo "[KRKR] 候选源文件数: ${#SRCS[@]}"
-[ "${#SRCS[@]}" -gt 0 ] || { echo "[KRKR] ERROR: 没有找到任何 .cpp，仓库布局变化？检查 $KRKR_SRC"; exit 1; }
-
-# 3c. 入口探测: 定义 main 的 TU 只保留一个
-MAIN_TUS=()
-for f in "${SRCS[@]}"; do
-    grep -lE "(int|void)[[:space:]]+main[[:space:]]*\(" "$f" >/dev/null 2>&1 && MAIN_TUS+=("$f")
-done
-echo "[KRKR] 含 main 的 TU: ${#MAIN_TUS[@]}"
-for f in "${MAIN_TUS[@]}"; do echo "       $(basename "$f")"; done
+if [ ! -d "$TP/cocos2d-x/cocos" ]; then
+    echo "[KRKR] fetch-thirdparty ..."
+    export KR2_THIRD_PARTY="$TP"
+    export KR2_WITH_BLEND2D=0
+    bash "$KX_SRC/scripts/linux/fetch-thirdparty.sh" || echo "[KRKR] WARNING: fetch-thirdparty 部分失败，继续（CMake 阶段会报缺什么）"
+fi
+[ -f "$TP/cocos2d-x/cocos/cocos2d.h" ] || { echo "[KRKR] ERROR: cocos2d-x 未就绪"; exit 1; }
 
 # ---------------------------------------------------------------------------
-# 4. 编译（先试全量，失败时打印前 30 行错误 + 修复指引）
+# 3. cocos2d-x API 补丁（Kirikinux2 自带，幂等）
 # ---------------------------------------------------------------------------
-CC_BIN="xcrun -sdk iphoneos clang++"
-ARCH="-arch arm64 -miphoneos-version-min=14.0"
-BASE_FLAGS=(-std=c++14 -O2 $ARCH -fno-objc-arc -DSDL_STATIC=1 -DNDEBUG "${INCS[@]}")
+echo "[KRKR] patch cocos2d-x ..."
+python3 "$KX_SRC/scripts/linux/patch-cocos2dx.py" "$TP/cocos2d-x" || echo "[KRKR] WARNING: cocos patch 部分失败（iOS 分支容错）"
 
-OBJ_DIR="$WORK/obj"
-rm -rf "$OBJ_DIR"; mkdir -p "$OBJ_DIR"
+# ---------------------------------------------------------------------------
+# 4. 注入 iOS 宿主 + iOS 构建清单
+# ---------------------------------------------------------------------------
+mkdir -p "$KX_SRC/platform/ios/compat"
+cp -f "$IOS_HOST/IOSMain.mm" "$IOS_HOST/IOSUtils.cpp" "$IOS_HOST/KR2IOSStubs.cpp" "$KX_SRC/platform/ios/"
+cp -f "$IOS_HOST/CMakeLists.ios" "$KX_SRC/CMakeLists.ios"
 
-compile_all() {
-    local objs=()
-    for f in "${SRCS[@]}"; do
-        local o="$OBJ_DIR/$(echo "$f" | sed "s|$KRKR_SRC/||; s|/|__|g; s|\.cpp$|.o|")"
-        if ! $CC_BIN "${BASE_FLAGS[@]}" -Dmain=krkr_entry -c "$f" -o "$o" 2>"$o.err"; then
-            return 1
-        fi
-        objs+=("$o")
+# ---------------------------------------------------------------------------
+# 5. CMake iOS 构建
+# ---------------------------------------------------------------------------
+if [ "${KR2_SKIP_BUILD:-0}" != "1" ]; then
+    rm -rf "$KRKR_BUILD"
+    # 用 iOS 清单替换顶层 CMakeLists（原 Linux 版备份为 CMakeLists.linux.bak）
+    if [ ! -f "$KX_SRC/CMakeLists.linux.bak" ]; then
+        cp -f "$KX_SRC/CMakeLists.txt" "$KX_SRC/CMakeLists.linux.bak"
+    fi
+    cp -f "$IOS_HOST/CMakeLists.ios" "$KX_SRC/CMakeLists.txt"
+    cmake -S "$KX_SRC" -B "$KRKR_BUILD" -G Ninja \
+        -DCMAKE_SYSTEM_NAME=iOS \
+        -DCMAKE_OSX_SYSROOT=iphoneos \
+        -DCMAKE_OSX_ARCHITECTURES=arm64 \
+        -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0 \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DBUILD_SHARED_LIBS=OFF \
+        -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
+        -DKR2_ROOT="$KX_SRC" \
+        -DKR2_COCOS2DX_ROOT="$TP/cocos2d-x" \
+        -DKR2_THIRD_PARTY="$TP" \
+        -DKR2_WITH_BLEND2D=0 \
+        -DKR2_WITH_JXR=0
+    cmake --build "$KRKR_BUILD" -j "$(sysctl -n hw.ncpu)"
+
+    for lib in libkrkr2core.a libkrkr2plugin.a libkrkr2plugin_ext.a libcocos2d.a; do
+        found=$(find "$KRKR_BUILD" -name "$lib" | head -n 1)
+        [ -n "$found" ] && cp -f "$found" "$BUILD_ROOT/lib/$lib"
     done
-    # 打包
-    rm -f "$BUILD_ROOT/lib/libkrkr2.a"
-    xcrun -sdk iphoneos ar rcs "$BUILD_ROOT/lib/libkrkr2.a" "${objs[@]}"
-    xcrun -sdk iphoneos ranlib "$BUILD_ROOT/lib/libkrkr2.a"
-    return 0
-}
 
-if compile_all; then
-    echo "[KRKR] OK -> $BUILD_ROOT/lib/libkrkr2.a"
-else
-    echo "==============================================================="
-    echo "[KRKR] 编译失败。打印前 30 行首个错误:"
-    FIRST_ERR=$(find "$OBJ_DIR" -name "*.err" -size +0c | head -n 1)
-    head -n 30 "$FIRST_ERR" || true
-    echo "==============================================================="
-    echo "[KRKR] 常见修复（见 PORTING_NOTES.md）:"
-    echo "  1. 平台目录误编译 —— 把目录名加进本脚本 EXCLUDE_PAT"
-    echo "  2. 缺依赖头/库 —— Kirikiroid2 内置 third_party（boost/oniguruma/freetype 等）"
-    echo "     若仓库顶层存在 third_party*/ 目录，执行:"
-    echo "       find $KRKR_SRC/third_party* -type d | head -50  并补进 INCS"
-    echo "  3. main 探测错误 —— 手动把正确的入口 TU 传给 -Dmain=krkr_entry"
-    echo "  4. 若其 SDL fork 与 upstream SDL2 冲突 —— 本脚本已统一用一份 SDL2,"
-    echo "     检查 engines/SDL2/build_ios.sh 是否用了 Kirikiroid2 的 fork"
-    exit 1
+    # 引擎自带 UI 的资源
+    rm -rf "$ROOT_DIR/build/krkr-resources"
+    mkdir -p "$ROOT_DIR/build/krkr-resources"
+    if [ -d "$KX_SRC/cocos/kr2/Resources" ]; then
+        cp -R "$KX_SRC/cocos/kr2/Resources/"* "$ROOT_DIR/build/krkr-resources/" 2>/dev/null || true
+    fi
+    if [ -d "$KX_SRC/cocos/kr2" ]; then
+        for d in cocosstudio fonts shader res; do
+            [ -d "$KX_SRC/cocos/kr2/$d" ] && cp -R "$KX_SRC/cocos/kr2/$d" "$ROOT_DIR/build/krkr-resources/" || true
+        done
+    fi
+
+    {
+        echo "- **Kirikinux2 (Kirikiroid2 引擎 iOS 移植)**: https://github.com/Comet387/Kirikinux2 @ $KX_COMMIT"
+        echo "  cocos2d-x: 3.17.2 (官方 tag, 已应用 scripts/linux/patch-cocos2dx.py) -> build/ios/lib/"
+    } >> "$ROOT_DIR/THIRD_PARTY_RESOLVED.md"
+    echo "[KRKR] OK"
 fi
-
-{
-    echo "- **Kirikiroid2**: https://github.com/zzz-ooo/Kirikiroid2 @ $COMMIT -> build/ios/lib/libkrkr2.a"
-} >> "$ROOT_DIR/THIRD_PARTY_RESOLVED.md"
