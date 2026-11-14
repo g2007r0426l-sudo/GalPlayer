@@ -26,7 +26,9 @@ echo "==== [3/6] ONScripter ===="
 bash "$ROOT_DIR/engines/onscripter/build_ios.sh"
 
 echo "==== [4/6] Kirikiroid2 (Kirikiri2 核心) ===="
-if bash "$ROOT_DIR/engines/kirikiroid2/build_ios.sh"; then
+if [ "${SKIP_KRKR:-0}" = "1" ]; then
+    echo "[build] SKIP_KRKR=1 —— 跳过 KRKR 引擎（快速出包模式）"
+elif bash "$ROOT_DIR/engines/kirikiroid2/build_ios.sh"; then
     echo "[build] KRKR 引擎构建成功"
 else
     echo "[build] WARNING: KRKR 引擎构建失败 —— 本次 .deb 仅含主 App（ONS），KRKR 相关功能不可用"

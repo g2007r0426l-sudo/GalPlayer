@@ -45,6 +45,9 @@ jobs:
             engines-
 
       - name: 一键全量构建（字体→SDL2→ONScripter→Kirikiri→App→.deb）
+        env:
+          # 1 = 跳过 KRKR 引擎（快速出包，先保证 ONS 版可交付）；KRKR 攻坚时改为 0
+          SKIP_KRKR: "1"
         run: |
           chmod +x scripts/*.sh engines/*/*.sh packaging/*.sh
           ./scripts/build_all.sh
