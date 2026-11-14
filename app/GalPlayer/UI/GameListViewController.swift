@@ -90,7 +90,7 @@ final class GameListViewController: UIViewController {
 
     private func buildSidebar() {
         sidebarTitle.text = "🌸 GalPlayer"
-        sidebarTitle.font = Theme.roundedFont(size: 30, weight: .heavy)
+        sidebarTitle.font = Theme.uiFont(size: 30, weight: .heavy)
         sidebarTitle.textColor = Theme.text
         sidebarTitle.translatesAutoresizingMaskIntoConstraints = false
         sidebarView.addSubview(sidebarTitle)
@@ -111,7 +111,7 @@ final class GameListViewController: UIViewController {
             let btn = UIButton(type: .system)
             btn.setImage(UIImage(systemName: icon)?.withRenderingMode(.alwaysTemplate), for: .normal)
             btn.setTitle(title, for: .normal)
-            btn.titleLabel?.font = Theme.roundedFont(size: 15, weight: .semibold)
+            btn.titleLabel?.font = Theme.uiFont(size: 16)
             btn.contentHorizontalAlignment = .leading
             btn.imageEdgeInsets = UIEdgeInsets(top: 0, left: 14, bottom: 0, right: 8)
             btn.titleEdgeInsets = UIEdgeInsets(top: 0, left: 10, bottom: 0, right: 0)
@@ -148,7 +148,7 @@ final class GameListViewController: UIViewController {
 
     private func buildContent() {
         titleLabel.text = "游戏库"
-        titleLabel.font = Theme.roundedFont(size: 34, weight: .heavy)
+        titleLabel.font = Theme.uiFont(size: 36, weight: .heavy)
         titleLabel.textColor = Theme.text
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
         contentWrap.addSubview(titleLabel)
@@ -246,7 +246,7 @@ final class GameListViewController: UIViewController {
 
         emptyLabel.numberOfLines = 0
         emptyLabel.textAlignment = .center
-        emptyLabel.font = Theme.roundedFont(size: 15)
+        emptyLabel.font = Theme.uiFont(size: 16)
         emptyLabel.textColor = Theme.textSub
         emptyLabel.text = "🎀 这里还空空哒 🎀\n\n把游戏文件夹放进\n/var/mobile/Documents/Galgames/\n\n游戏就会自动出现在这里啦～"
         emptyLabel.frame = CGRect(x: 0, y: 0, width: 500, height: 320)

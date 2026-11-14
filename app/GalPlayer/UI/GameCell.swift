@@ -53,7 +53,7 @@ final class GameCell: UICollectionViewCell {
         contentView.addSubview(timeChip)
         contentView.addSubview(engineChip)
 
-        nameLabel.font = Theme.roundedFont(size: 15, weight: .semibold)
+        nameLabel.font = Theme.uiFont(size: 15, weight: .semibold)
         nameLabel.textColor = Theme.text
         nameLabel.lineBreakMode = .byTruncatingTail
         nameLabel.translatesAutoresizingMaskIntoConstraints = false

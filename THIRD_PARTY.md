@@ -43,11 +43,17 @@
 - 使用范围: ONScripter `-DUSE_OGG_VORBIS` 音频解码
 - 协议: **BSD-3-Clause**
 
-## 6. DroidSansFallback 字体
+## 6. 字体
 
+### DroidSansFallback
 - 来源: Android AOSP `frameworks/base/data/fonts/`
-- 使用范围: App 内置 CJK 兜底字体（启动时拷入游戏目录供引擎渲染中文）
+- 使用范围: 引擎渲染兜底 CJK 字体（启动时拷入游戏目录）
 - 协议: **Apache-2.0**
+
+### LXGW WenKai（霞鹜文楷）
+- 来源: https://github.com/lxgw/LxgwWenKai
+- 使用范围: GalPlayer 界面字体（学习咔咔喵的软萌界面风格）
+- 协议: **SIL Open Font License 1.1**（可自由打包分发）
 
 ## 7. XcodeGen（构建工具，仅 Mac 端使用，不进 App 包）
 

@@ -56,6 +56,12 @@ enum Theme {
         let desc = base.fontDescriptor.withDesign(.rounded)
         return desc.map { UIFont(descriptor: $0, size: size) } ?? base
     }
+
+    /// 界面主字体: 霞鹜文楷（咔咔喵同款软萌手写感），缺失时回退圆润系统字体
+    static func uiFont(size: CGFloat, weight: UIFont.Weight = .regular) -> UIFont {
+        if let f = UIFont(name: "LXGW WenKai", size: size) { return f }
+        return roundedFont(size: size, weight: weight == .regular ? .medium : weight)
+    }
 }
 
 /// 相对时间（"30分钟前" 风格）
