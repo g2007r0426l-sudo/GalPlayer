@@ -1,0 +1,51 @@
+# =============================================================================
+# GitHub Actions 云端 Mac 编译 —— 没有 Mac 也能出 .deb
+#
+# 用法:
+#   1. 把整个 GalPlayer 文件夹推到一个 GitHub 仓库（建议公开仓库 = 免费不限时长）
+#   2. 仓库页面 -> Actions -> Build GalPlayer -> Run workflow
+#   3. 跑完后在该次运行页面的 Artifacts 下载 galplayer-deb
+#   4. 解压得到 com.yg.galplayer_0.1.0_iphoneos-arm64.deb -> 传进 iPad 安装
+# =============================================================================
+name: Build GalPlayer
+
+on:
+  workflow_dispatch:      # 手动点击运行
+  push:
+    branches: [ main, master ]
+
+jobs:
+  build:
+    runs-on: macos-14     # 苹果 Silicon 云端 Mac
+    timeout-minutes: 300
+    steps:
+      - name: 拉取代码
+        uses: actions/checkout@v4
+
+      - name: 安装构建依赖
+        run: |
+          brew install cmake ninja xcodegen ldid dpkg
+
+      - name: 一键全量构建（字体→SDL2→ONScripter→Kirikiri→App→.deb）
+        run: |
+          chmod +x scripts/*.sh engines/*/*.sh packaging/*.sh
+          ./scripts/build_all.sh
+
+      - name: 上传 .deb 产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: galplayer-deb
+          path: |
+            dist/*.deb
+          if-no-files-found: error
+
+      - name: 上传构建日志（失败时排障用）
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-logs
+          path: |
+            engines/onscripter/src/**/*.orig
+            build/sdl2-ios/CMakeCache.txt
+            THIRD_PARTY_RESOLVED.md
+          if-no-files-found: ignore

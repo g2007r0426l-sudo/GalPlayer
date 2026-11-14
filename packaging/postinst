@@ -1,0 +1,14 @@
+#!/bin/sh
+# 安装后: 修正权限 + ldid 递归签名兜底 + uicache 注册图标
+if [ -d /var/jb ]; then
+  APP_PATH="/var/jb/Applications/GalPlayer.app"
+else
+  APP_PATH="/Applications/GalPlayer.app"
+fi
+chown -R root:wheel "$APP_PATH"
+chmod -R 755 "$APP_PATH"
+# 递归签名兜底（若构建时已签，重复签无害）
+for f in $(find "$APP_PATH" -type f); do ldid -S "$f" 2>/dev/null; done
+ldid -S "$APP_PATH/GalPlayer"
+uicache -p "$APP_PATH"
+exit 0

@@ -1,0 +1,9 @@
+Package: com.yg.galplayer
+Name: GalPlayer
+Version: 0.1.0
+Architecture: iphoneos-arm64
+Depends: firmware (>= 14.0)
+Maintainer: YG
+Description: Local galgame player for jailbroken iPad (Kirikiri2 + ONScripter)
+Author: YG
+Section: Games

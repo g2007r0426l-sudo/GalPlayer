@@ -1,0 +1,4 @@
+#!/bin/sh
+# 卸载后: 移除图标缓存
+uicache -u com.yg.galplayer 2>/dev/null
+exit 0

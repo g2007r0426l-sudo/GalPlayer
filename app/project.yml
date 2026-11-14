@@ -1,0 +1,69 @@
+# =============================================================================
+# XcodeGen 工程定义 —— 生成: xcodegen generate （在 app/ 目录执行）
+# 纯代码 UIKit，无 storyboard；引擎静态库通过 OTHER_LDFLAGS 链接
+# =============================================================================
+name: GalPlayer
+options:
+  bundleIdPrefix: com.yg
+  createIntermediateGroups: true
+  deploymentTarget:
+    iOS: "14.0"
+
+settings:
+  base:
+    SWIFT_VERSION: "5.9"
+    CLANG_ENABLE_MODULES: "YES"
+    # 越狱 App: 构建期不签名，ldid 在打包脚本里递归签名
+    CODE_SIGN_STYLE: Manual
+    CODE_SIGN_IDENTITY: ""
+    CODE_SIGNING_REQUIRED: "NO"
+    CODE_SIGNING_ALLOWED: "NO"
+    ENABLE_BITCODE: "NO"
+    TARGETED_DEVICE_FAMILY: "2"          # iPad
+    ONLY_ACTIVE_ARCH: "NO"
+    ARCHS: "arm64"
+    SWIFT_OBJC_BRIDGING_HEADER: "$(SRCROOT)/GalPlayer/GalPlayer-Bridging-Header.h"
+    INFOPLIST_FILE: "$(SRCROOT)/GalPlayer/Info.plist"
+    PRODUCT_BUNDLE_IDENTIFIER: com.yg.galplayer
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    # 引擎静态库
+    LIBRARY_SEARCH_PATHS:
+      - "$(SRCROOT)/../build/ios/lib"
+    OTHER_LDFLAGS:
+      - "-ObjC"
+      - "-lc++"
+      - "-lSDL2"
+      - "-lons"
+      - "-lkrkr2"
+      - "-lfreetype"
+      - "-lvorbis"
+      - "-logg"
+      - "-liconv"
+      - "-lz"
+    OTHER_CPLUSPLUSFLAGS:
+      - "-std=c++14"
+
+targets:
+  GalPlayer:
+    type: application
+    platform: iOS
+    sources:
+      - path: GalPlayer
+        excludes:
+          - "Info.plist"
+    # SDL2 在 iOS 上需要的系统框架
+    frameworks:
+      - sdk: UIKit.framework
+      - sdk: Foundation.framework
+      - sdk: CoreGraphics.framework
+      - sdk: QuartzCore.framework
+      - sdk: CoreText.framework
+      - sdk: OpenGLES.framework
+      - sdk: Metal.framework
+      - sdk: AVFoundation.framework
+      - sdk: AudioToolbox.framework
+      - sdk: CoreAudio.framework
+      - sdk: CoreMedia.framework
+      - sdk: CoreMotion.framework
+      - sdk: MediaPlayer.framework

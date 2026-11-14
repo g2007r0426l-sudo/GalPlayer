@@ -1,0 +1,4 @@
+#!/bin/sh
+# 卸载/升级前: 结束运行中的 GalPlayer
+killall GalPlayer 2>/dev/null
+exit 0
