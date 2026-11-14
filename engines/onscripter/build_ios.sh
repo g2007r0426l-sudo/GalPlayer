@@ -236,9 +236,7 @@ done
 $CXX "${CXXFLAGS[@]}" -c "$COMPAT_INC/onsdl_compat.cpp" -o "$WORK/obj/onsdl_compat.o"
 OBJS+=("$WORK/obj/onsdl_compat.o")
 
-xcrun -sdk iphoneos ar rcs "$OUT" "${OBJS[@]}" "$BUILD_ROOT/lib/libjpeg.a" 2>/dev/null || {
-    xcrun -sdk iphoneos ar rcs "$OUT" "${OBJS[@]}"
-}
+xcrun -sdk iphoneos ar rcs "$OUT" "${OBJS[@]}"
 xcrun -sdk iphoneos ranlib "$OUT"
 
 echo "[ONS] OK -> $OUT"
