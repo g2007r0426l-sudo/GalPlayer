@@ -1,16 +1,23 @@
 // =============================================================================
-// ONSGlue.mm — ONScripter 独立 App 的启动胶水
-//   1. 读标记文件 /var/mobile/Documents/Galgames/.ons_launch（第一行=游戏目录）
-//   2. chdir 到游戏目录（引擎存档落在游戏目录内）
-//   3. 安装统一触控映射（单击=左键推进 / 双指=右键菜单 / 长按=快进）
-//   4. 调用引擎入口 ons_main（编译期 -Dmain=ons_main 重命名）
+// ONSGlue.mm - ONScripter standalone player glue
+//   1. read marker file /var/mobile/Documents/Galgames/.ons_launch (line 1 = game dir)
+//   2. chdir into game dir (saves land inside game dir)
+//   3. install unified touch mapping (tap = left click, 2-finger = right click, long press = skip)
+//   4. call engine entry ons_main (renamed at build time with -Dmain=ons_main)
+//
+// NOTE: all log strings are ASCII on purpose - keeps the file encoding-safe.
 // =============================================================================
+#import <UIKit/UIKit.h>
+#import <Metal/Metal.h>
+
 #define SDL_MAIN_HANDLED 1
 #include <SDL.h>
 
 #include <unistd.h>
 #include <sys/stat.h>
+#include <cerrno>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <map>
 #include <mutex>
@@ -18,14 +25,12 @@
 #include <thread>
 #include <chrono>
 
-// 由 engines/onscripter 编译产出（-Dmain=ons_main）
 int ons_main(int argc, char **argv);
-// SDL1.2 兼容层
 extern "C" void onsdl_set_scale_mode(int stretch);
 
 static const char *K_MARKER = "/var/mobile/Documents/Galgames/.ons_launch";
 
-// ============================ 触控映射 =====================================
+// ============================ touch mapping ================================
 static const Uint32 LONG_PRESS_MS  = 450;
 static const Uint32 TWO_FINGER_MAX = 400;
 static const float  MOVE_EPS       = 0.02f;
@@ -39,7 +44,7 @@ static bool   g_pendingRight = false;
 static Uint32 g_twoT0 = 0;
 static Uint32 g_lastClick = 0;
 static bool   g_monitorRun = false;
-static std::thread *g_monitor = nullptr;   // 堆分配：避免 exit() 时析构 joinable thread → std::terminate
+static std::thread *g_monitor = nullptr;  // heap: avoid joinable-thread terminate on exit()
 
 static SDL_Window *engineWindow() { return SDL_GetWindowFromID(1); }
 
@@ -50,7 +55,7 @@ static void pushMotion(float nx, float ny) {
     SDL_Event ev; SDL_zero(ev);
     ev.motion.type = SDL_MOUSEMOTION;
     ev.motion.windowID = SDL_GetWindowID(w);
-    ev.motion.x = nx * ww; ev.motion.y = ny * wh;
+    ev.motion.x = (Sint32)(nx * ww); ev.motion.y = (Sint32)(ny * wh);
     SDL_PushEvent(&ev);
 }
 
@@ -64,7 +69,7 @@ static void pushButton(bool down, Uint8 button, float nx, float ny) {
     ev.button.button = button;
     ev.button.state = down ? SDL_PRESSED : SDL_RELEASED;
     ev.button.clicks = 1;
-    ev.button.x = nx * ww; ev.button.y = ny * wh;
+    ev.button.x = (Sint32)(nx * ww); ev.button.y = (Sint32)(ny * wh);
     SDL_PushEvent(&ev);
 }
 
@@ -82,14 +87,13 @@ static void stopSkipLocked() {
     if (g_skip) { pushCtrl(false); g_skip = false; }
 }
 
-// 长按快进监控：延迟判定 + 周期连点
 static void monitorLoop() {
     while (g_monitorRun) {
         std::this_thread::sleep_for(std::chrono::milliseconds(20));
         std::lock_guard<std::mutex> lk(g_mtx);
         Uint32 now = SDL_GetTicks();
         if (g_fingers.size() == 1 && g_leftDown) {
-            auto &f = g_fingers.begin()->second;
+            FingerInfo &f = g_fingers.begin()->second;
             Uint32 held = now - f.t0;
             if (!g_skip && held >= LONG_PRESS_MS) {
                 pushButton(false, SDL_BUTTON_LEFT, f.x, f.y);
@@ -119,7 +123,7 @@ static int touchWatch(void *, SDL_Event *e) {
             pushButton(true, SDL_BUTTON_LEFT, x, y);
             g_leftDown = true;
         } else if (g_fingers.size() == 1) {
-            auto it = g_fingers.begin();
+            std::map<SDL_FingerID, FingerInfo>::iterator it = g_fingers.begin();
             pushButton(false, SDL_BUTTON_LEFT, it->second.x, it->second.y);
             g_leftDown = false;
             stopSkipLocked();
@@ -133,7 +137,7 @@ static int touchWatch(void *, SDL_Event *e) {
     }
     case SDL_FINGERMOTION: {
         std::lock_guard<std::mutex> lk(g_mtx);
-        auto it = g_fingers.find(e->tfinger.fingerId);
+        std::map<SDL_FingerID, FingerInfo>::iterator it = g_fingers.find(e->tfinger.fingerId);
         if (it == g_fingers.end()) break;
         float x = e->tfinger.x, y = e->tfinger.y;
         float dx = x - it->second.x, dy = y - it->second.y;
@@ -144,7 +148,7 @@ static int touchWatch(void *, SDL_Event *e) {
     }
     case SDL_FINGERUP: {
         std::lock_guard<std::mutex> lk(g_mtx);
-        auto it = g_fingers.find(e->tfinger.fingerId);
+        std::map<SDL_FingerID, FingerInfo>::iterator it = g_fingers.find(e->tfinger.fingerId);
         if (it == g_fingers.end()) break;
         FingerInfo f = it->second;
         g_fingers.erase(it);
@@ -169,18 +173,18 @@ static int touchWatch(void *, SDL_Event *e) {
     return 1;
 }
 
-// ============================ 入口 =========================================
+// ============================ entry ========================================
 int GP_ONS_Entry(int argc, char **argv) {
-    // 0. 运行日志：把 stdout/stderr 重定向到文件（iOS 上 stderr 不进 syslog，排障必需）
+    // 0. runtime log (stderr is not visible in iOS syslog for apps)
     if (FILE *lf = fopen("/var/mobile/Documents/ons_runtime.log", "w")) {
         dup2(fileno(lf), 1);
         dup2(fileno(lf), 2);
         setvbuf(stdout, nullptr, _IONBF, 0);
         setvbuf(stderr, nullptr, _IONBF, 0);
     }
-    fprintf(stderr, "[ONSApp] 启动, argc=%d\n", argc);
+    fprintf(stderr, "[ONSApp] start argc=%d\n", argc);
 
-    // 1. 读标记文件（第一行 = 游戏目录）
+    // 1. marker
     std::string gameDir;
     if (FILE *fp = fopen(K_MARKER, "r")) {
         char line[1024];
@@ -190,60 +194,52 @@ int GP_ONS_Entry(int argc, char **argv) {
             gameDir = line;
         }
         fclose(fp);
-        unlink(K_MARKER); // 一次性消费
+        unlink(K_MARKER);
     }
     if (gameDir.empty()) gameDir = "/var/mobile/Documents/Galgames";
     fprintf(stderr, "[ONSApp] gameDir=%s\n", gameDir.c_str());
 
-    if (::chdir(gameDir.c_str()) != 0) {
-        fprintf(stderr, "[ONSApp] chdir 失败 errno=%d (%s)\n", errno, gameDir.c_str());
-    }
+    if (::chdir(gameDir.c_str()) != 0)
+        fprintf(stderr, "[ONSApp] chdir failed errno=%d\n", errno);
     char cwd[1024] = {0};
     if (getcwd(cwd, sizeof(cwd))) fprintf(stderr, "[ONSApp] cwd=%s\n", cwd);
 
-    // 探测脚本文件（与 ScriptHandler 顺序一致）
-    for (const char *fn : {"0.txt", "00.txt", "nscript.dat", "nscript.___"}) {
-        if (access(fn, R_OK) == 0) fprintf(stderr, "[ONSApp] 找到脚本: %s\n", fn);
-    }
+    const char *scripts[] = {"0.txt", "00.txt", "nscript.dat", "nscript.___"};
+    for (int i = 0; i < 4; ++i)
+        if (access(scripts[i], R_OK) == 0)
+            fprintf(stderr, "[ONSApp] script found: %s\n", scripts[i]);
 
-    // 1.5 GPU 可用性直测（判断是环境禁用还是 SDL 窗口问题）
-    {
-        int ndrv = SDL_GetNumRenderDrivers();
-        fprintf(stderr, "[ONSApp] 预检: 渲染驱动=%d\n", ndrv);
-    }
+    // 2. GPU / environment probe
     @autoreleasepool {
-        Class mtlCls = NSClassFromString(@"MTLCreateSystemDefaultDevice");
-        (void)mtlCls;
-        id dev = ((id (*)(void))NSClassFromString(@"MTLCreateSystemDefaultDevice"))();
-        fprintf(stderr, "[ONSApp] 预检: MTLCreateSystemDefaultDevice = %s\n", dev ? "OK" : "nil(GPU 不可用)");
+        id<MTLDevice> dev = MTLCreateSystemDefaultDevice();
+        fprintf(stderr, "[ONSApp] probe MTLDevice=%s\n", dev ? "OK" : "nil");
         UIScreen *scr = [UIScreen mainScreen];
         CGRect b = scr ? scr.bounds : CGRectZero;
-        fprintf(stderr, "[ONSApp] 预检: mainScreen=%.0fx%.0f scale=%.1f\n",
-                b.size.width, b.size.height, scr ? scr.scale : 0.0);
-        fprintf(stderr, "[ONSApp] 预检: videoDriver=%s\n",
-                SDL_GetCurrentVideoDriver() ? SDL_GetCurrentVideoDriver() : "(null)");
+        fprintf(stderr, "[ONSApp] probe screen=%.0fx%.0f scale=%.1f\n",
+                (double)b.size.width, (double)b.size.height, scr ? (double)scr.scale : 0.0);
+        const char *drv = SDL_GetCurrentVideoDriver();
+        fprintf(stderr, "[ONSApp] probe videoDriver=%s\n", drv ? drv : "(null)");
     }
 
-    // 2. SDL 环境
+    // 3. SDL hints + touch bridge
     SDL_SetHint(SDL_HINT_ORIENTATIONS, "LandscapeLeft LandscapeRight");
     SDL_SetHint(SDL_HINT_TOUCH_MOUSE_EVENTS, "0");
     SDL_SetHint(SDL_HINT_MOUSE_TOUCH_EVENTS, "0");
     SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "1");
-    onsdl_set_scale_mode(0); // 0=原始比例；如需拉伸全屏改 1
+    onsdl_set_scale_mode(0);
 
-    // 3. 触控映射 + 监控线程
     SDL_AddEventWatch(touchWatch, nullptr);
     g_monitorRun = true;
     g_monitor = new std::thread(monitorLoop);
     g_monitor->detach();
 
-    // 4. 引擎主循环
-    //    注意: ONScripter 的参数解析只接受以 '-' 开头的选项，传裸目录会被判非法
-    //    并调用 optionHelp() -> exit()。我们已 chdir 到游戏目录，因此不传任何参数。
+    // 4. engine main loop
+    //    ONScripter only accepts '-' options; a bare directory arg triggers optionHelp()+exit().
+    //    We already chdir'ed into the game dir, so pass no arguments.
     std::string a0 = "onscripter";
     char *av[] = { const_cast<char *>(a0.c_str()), nullptr };
     int rc = ons_main(1, av);
-    fprintf(stderr, "[ONSApp] ons_main 退出 rc=%d\n", rc);
+    fprintf(stderr, "[ONSApp] ons_main returned rc=%d\n", rc);
 
     g_monitorRun = false;
     SDL_DelEventWatch(touchWatch, nullptr);
