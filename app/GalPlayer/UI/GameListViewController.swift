@@ -27,6 +27,7 @@ final class GameListViewController: UIViewController {
     private let titleLabel = UILabel()
     private let subtitleLabel = UILabel()
     private let refreshButton = UIButton(type: .system)
+    private let importButton = UIButton(type: .system)
     private let searchBar = UISearchBar()
     private var collectionView: UICollectionView!
     private let emptyLabel = UILabel()
@@ -161,6 +162,21 @@ final class GameListViewController: UIViewController {
         refreshButton.addTarget(self, action: #selector(refreshTapped), for: .touchUpInside)
         contentWrap.addSubview(refreshButton)
 
+        // 导入游戏按钮
+        let importCfg = UIImage.SymbolConfiguration(pointSize: 17, weight: .semibold)
+        importButton.setImage(UIImage(systemName: "square.and.arrow.down", withConfiguration: importCfg)?
+            .withRenderingMode(.alwaysTemplate), for: .normal)
+        importButton.tintColor = Theme.accentDeep
+        importButton.backgroundColor = Theme.cardBg
+        importButton.layer.cornerRadius = 22
+        importButton.layer.shadowColor = UIColor.black.cgColor
+        importButton.layer.shadowOpacity = 0.08
+        importButton.layer.shadowRadius = 8
+        importButton.layer.shadowOffset = CGSize(width: 0, height: 3)
+        importButton.accessibilityLabel = "导入游戏"
+        importButton.translatesAutoresizingMaskIntoConstraints = false
+        importButton.addTarget(self, action: #selector(importTapped), for: .touchUpInside)
+        contentWrap.addSubview(importButton)
         searchBar.placeholder = "🔍 搜索游戏"
         searchBar.searchBarStyle = .minimal
         searchBar.backgroundImage = UIImage()
@@ -179,6 +195,11 @@ final class GameListViewController: UIViewController {
             refreshButton.trailingAnchor.constraint(equalTo: contentWrap.trailingAnchor, constant: -24),
             refreshButton.widthAnchor.constraint(equalToConstant: 44),
             refreshButton.heightAnchor.constraint(equalToConstant: 44),
+
+            importButton.centerYAnchor.constraint(equalTo: titleLabel.centerYAnchor),
+            importButton.trailingAnchor.constraint(equalTo: refreshButton.leadingAnchor, constant: -10),
+            importButton.widthAnchor.constraint(equalToConstant: 44),
+            importButton.heightAnchor.constraint(equalToConstant: 44),
 
             searchBar.topAnchor.constraint(equalTo: subtitleLabel.bottomAnchor, constant: 14),
             searchBar.leadingAnchor.constraint(equalTo: contentWrap.leadingAnchor, constant: 20),
@@ -328,6 +349,26 @@ final class GameListViewController: UIViewController {
         applyFilter()
     }
 
+    @objc private func importTapped() {
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        GameImporter.shared.onFinished = { [weak self] imported, message in
+            guard let self else { return }
+            if imported > 0 {
+                self.rescan(force: true)
+                let alert = UIAlertController(title: "导入完成",
+                                              message: "已导入 \(imported) 个游戏 🎀",
+                                              preferredStyle: .alert)
+                alert.addAction(UIAlertAction(title: "好", style: .default))
+                self.present(alert, animated: true)
+            } else if let message {
+                let alert = UIAlertController(title: "没能导入", message: message, preferredStyle: .alert)
+                alert.addAction(UIAlertAction(title: "知道了", style: .default))
+                self.present(alert, animated: true)
+            }
+        }
+        GameImporter.shared.presentPicker(from: self)
+    }
+
     @objc private func refreshTapped() {
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
         // 图标旋转动效
@@ -344,7 +385,18 @@ final class GameListViewController: UIViewController {
                 self.refreshButton.transform = .identity
             }
         }
-        rescan(force: true)
+        // 顺手把「文件」App 里投放到 GalPlayer 的文件夹收进来
+        GameImporter.shared.importFromInbox { [weak self] imported, _ in
+            guard let self else { return }
+            self.rescan(force: true)
+            if imported > 0 {
+                let alert = UIAlertController(title: "已收录 \(imported) 个游戏",
+                                              message: "从「文件」App 的 GalPlayer 文件夹导入完成 🎀",
+                                              preferredStyle: .alert)
+                alert.addAction(UIAlertAction(title: "好", style: .default))
+                self.present(alert, animated: true)
+            }
+        }
     }
 
     @objc private func libraryChanged() {

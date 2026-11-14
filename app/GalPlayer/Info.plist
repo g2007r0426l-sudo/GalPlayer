@@ -44,6 +44,10 @@
 	<string>1</string>
 	<key>MinimumOSVersion</key>
 	<string>14.0</string>
+	<key>UIFileSharingEnabled</key>
+	<true/>
+	<key>LSSupportsOpeningDocumentsInPlace</key>
+	<true/>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>ITSAppUsesNonExemptEncryption</key>
