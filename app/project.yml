@@ -32,6 +32,7 @@ settings:
       - "$(SRCROOT)/../build/ios/lib"
     OTHER_LDFLAGS:
       - "-ObjC"
+      - "-Wl,-all_load"
       - "-lc++"
       - "-lSDL2"
       - "-lons"
@@ -43,6 +44,7 @@ settings:
       - "-lSDL2_image"
       - "-lSDL2_ttf"
       - "-lSDL2_mixer"
+      - "-lSDL2stdlib"
       - "-liconv"
       - "-lz"
     OTHER_CPLUSPLUSFLAGS:

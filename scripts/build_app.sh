@@ -10,7 +10,7 @@ APP_DIR="$ROOT_DIR/app"
 BUILD_ROOT="$ROOT_DIR/build/ios"
 
 # 引擎库检查（缺失给出明确指引）
-for lib in libSDL2.a libons.a libkrkr2.a libfreetype.a; do
+for lib in libSDL2.a libons.a libkrkr2.a libfreetype.a libSDL2_image.a libSDL2_ttf.a libSDL2_mixer.a libSDL2stdlib.a; do
     if [ ! -f "$BUILD_ROOT/lib/$lib" ]; then
         echo "[app] ERROR: 缺少 $BUILD_ROOT/lib/$lib"
         echo "  先依次运行:"

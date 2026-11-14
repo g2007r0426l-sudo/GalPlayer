@@ -96,6 +96,31 @@ echo "[SDL2] SDL_config.h 来源: $(grep -m1 'SDL_CONFIG_H_FROM\|Generated' "$BU
 echo "[SDL2] OK -> $BUILD_ROOT/lib/libSDL2.a"
 
 # ---------------------------------------------------------------------------
+# 3a. SDL2 stdlib 兜底库（SDL_string/malloc/qsort/iconv 等可移植实现）
+#     SDL_image/ttf/mixer 在某些 config 组合下会引用 SDL_strcmp 等符号，
+#     而 SDL2 自身按 HAVE_STRCMP 等宏可能不导出 —— 用这份兜底库补齐。
+# ---------------------------------------------------------------------------
+STDLIB_OBJ="$ROOT_DIR/build/sdl2stdlib"
+rm -rf "$STDLIB_OBJ"; mkdir -p "$STDLIB_OBJ"
+STDLIB_OBJS=()
+for f in "$SDL_SRC"/src/stdlib/*.c; do
+    base=$(basename "$f")
+    [ "$base" = "SDL_mslibc.c" ] && continue   # MSVC 专用
+    o="$STDLIB_OBJ/${base%.c}.o"
+    if xcrun -sdk iphoneos clang -arch arm64 -miphoneos-version-min=14.0 -O2 -DNDEBUG \
+        -I"$BUILD_DIR/include/SDL2" -I"$SDL_SRC/include" -c "$f" -o "$o"; then
+        STDLIB_OBJS+=("$o")
+    else
+        echo "[SDL2] stdlib 跳过: $base"
+    fi
+done
+if [ ${#STDLIB_OBJS[@]} -gt 0 ]; then
+    xcrun -sdk iphoneos ar rcs "$BUILD_ROOT/lib/libSDL2stdlib.a" "${STDLIB_OBJS[@]}"
+    xcrun -sdk iphoneos ranlib "$BUILD_ROOT/lib/libSDL2stdlib.a"
+    echo "[SDL2] stdlib 兜底库 OK -> $BUILD_ROOT/lib/libSDL2stdlib.a (${#STDLIB_OBJS[@]} 个对象)"
+fi
+
+# ---------------------------------------------------------------------------
 # 3b. 安装 SDL2（供 SDL_image/ttf/mixer 的 find_package 定位）+ 构建三件套
 # ---------------------------------------------------------------------------
 # 手动铺设 prefix 布局（SDL_image/ttf/mixer 的 PrivateSDL2 查找需要 lib+include 齐备）
@@ -166,11 +191,12 @@ build_sdl_ext() {
 # SDL_image: 关闭 ImageIO 后端（避免 CoreServices 依赖），启用内置 stb 解码器
 build_sdl_ext "image" "libsdl-org/SDL_image" "release-2.6.3|release-2.8.4|release-2.8.0" "no" \
     -DSDL2IMAGE_BACKEND_IMAGEIO=OFF -DSDL2IMAGE_BACKEND_STB=ON
-# SDL_ttf: freetype/harfbuzz 子模块 vendored 构建（recurse clone 已就位）
+# SDL_ttf: freetype/harfbuzz 子模块 vendored 构建（recurse clone 已就位）；关闭示例程序
 build_sdl_ext "ttf"   "libsdl-org/SDL_ttf"   "release-2.22.1|release-2.20.2|release-2.0.18" "yes" \
-    -DSDL2TTF_VENDORED=ON
-# SDL_mixer: 内置解码器（WAV/OGG/FLAC/MP3/MIDI 均为 in-tree）
-build_sdl_ext "mixer" "libsdl-org/SDL_mixer" "release-2.8.0|release-2.6.3" "no"
+    -DSDL2TTF_VENDORED=ON -DSDL2TTF_SAMPLES=OFF
+# SDL_mixer: 内置解码器（WAV/OGG/FLAC/MP3/MIDI 均为 in-tree）；关闭示例程序
+build_sdl_ext "mixer" "libsdl-org/SDL_mixer" "release-2.8.0|release-2.6.3" "no" \
+    -DSDL2MIXER_SAMPLES=OFF
 
 # 记录版本
 {
