@@ -72,11 +72,32 @@ SDL_Surface *SDL_Compat_SetVideoMode(int w, int h, int bpp, Uint32 flags) {
     }
 
     if (!g_renderer) {
-        g_renderer = SDL_CreateRenderer(g_window, -1,
-                                        SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
+        // iOS 上可用驱动有限（metal / opengles2 / opengles），逐个显式尝试并打印诊断
+        int ndrv = SDL_GetNumRenderDrivers();
+        fprintf(stderr, "[onsdl] 可用渲染驱动数=%d\n", ndrv);
+        for (int i = 0; i < ndrv; ++i) {
+            SDL_RendererInfo info;
+            if (SDL_GetRenderDriverInfo(i, &info) == 0)
+                fprintf(stderr, "[onsdl]   driver[%d]=%s\n", i, info.name);
+        }
+        const char *order[] = {"metal", "opengles2", "opengles", nullptr};
+        for (int i = 0; order[i]; ++i) {
+            g_renderer = SDL_CreateRenderer(g_window, order[i],
+                                            SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
+            if (g_renderer) {
+                fprintf(stderr, "[onsdl] renderer=%s 创建成功\n", order[i]);
+                break;
+            }
+            fprintf(stderr, "[onsdl] renderer %s 失败: %s\n", order[i], SDL_GetError());
+            g_renderer = SDL_CreateRenderer(g_window, order[i], SDL_RENDERER_ACCELERATED);
+            if (g_renderer) {
+                fprintf(stderr, "[onsdl] renderer=%s 创建成功(无vsync)\n", order[i]);
+                break;
+            }
+        }
         if (!g_renderer) {
-            // 兜底软渲
-            g_renderer = SDL_CreateRenderer(g_window, -1, 0);
+            g_renderer = SDL_CreateRenderer(g_window, -1, SDL_RENDERER_SOFTWARE);
+            if (g_renderer) fprintf(stderr, "[onsdl] renderer=software\n");
         }
         if (!g_renderer) {
             fprintf(stderr, "[onsdl] CreateRenderer failed: %s\n", SDL_GetError());
