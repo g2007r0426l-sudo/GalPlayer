@@ -171,6 +171,15 @@ static int touchWatch(void *, SDL_Event *e) {
 
 // ============================ 入口 =========================================
 int GP_ONS_Entry(int argc, char **argv) {
+    // 0. 运行日志：把 stdout/stderr 重定向到文件（iOS 上 stderr 不进 syslog，排障必需）
+    if (FILE *lf = fopen("/var/mobile/Documents/ons_runtime.log", "w")) {
+        dup2(fileno(lf), 1);
+        dup2(fileno(lf), 2);
+        setvbuf(stdout, nullptr, _IONBF, 0);
+        setvbuf(stderr, nullptr, _IONBF, 0);
+    }
+    fprintf(stderr, "[ONSApp] 启动, argc=%d\n", argc);
+
     // 1. 读标记文件（第一行 = 游戏目录）
     std::string gameDir;
     if (FILE *fp = fopen(K_MARKER, "r")) {
@@ -185,8 +194,17 @@ int GP_ONS_Entry(int argc, char **argv) {
     }
     if (gameDir.empty()) gameDir = "/var/mobile/Documents/Galgames";
     fprintf(stderr, "[ONSApp] gameDir=%s\n", gameDir.c_str());
-    if (::chdir(gameDir.c_str()) != 0)
-        fprintf(stderr, "[ONSApp] chdir 失败: %s\n", gameDir.c_str());
+
+    if (::chdir(gameDir.c_str()) != 0) {
+        fprintf(stderr, "[ONSApp] chdir 失败 errno=%d (%s)\n", errno, gameDir.c_str());
+    }
+    char cwd[1024] = {0};
+    if (getcwd(cwd, sizeof(cwd))) fprintf(stderr, "[ONSApp] cwd=%s\n", cwd);
+
+    // 探测脚本文件（与 ScriptHandler 顺序一致）
+    for (const char *fn : {"0.txt", "00.txt", "nscript.dat", "nscript.___"}) {
+        if (access(fn, R_OK) == 0) fprintf(stderr, "[ONSApp] 找到脚本: %s\n", fn);
+    }
 
     // 2. SDL 环境
     SDL_SetHint(SDL_HINT_ORIENTATIONS, "LandscapeLeft LandscapeRight");
