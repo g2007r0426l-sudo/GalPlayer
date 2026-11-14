@@ -27,11 +27,6 @@ final class GameSession {
     var isRunning: Bool { GP_EngineIsRunning() != 0 }
 
     func start(entry: GameEntry, completion: @escaping (Result<Void, String>) -> Void) {
-        guard !isRunning else {
-            completion(.failure("已有游戏在运行，请先退出"))
-            return
-        }
-
         let engine = EngineRegistry.shared.effectiveEngine(for: entry)
         guard engine.playable else {
             if engine == .artemis {
@@ -39,6 +34,26 @@ final class GameSession {
             } else {
                 completion(.failure("无法识别引擎，请在长按菜单中手动指定"))
             }
+            return
+        }
+
+        // KRKR 引擎: 双 App 架构 —— 写启动标记文件并拉起 Kirikinux2 独立 App
+        if engine == .kirikiri {
+            do {
+                let marker = try krkrLaunchMarker(for: entry)
+                try marker.write(to: URL(fileURLWithPath: "/var/mobile/Documents/Galgames/.krkr_launch"),
+                                 atomically: true, encoding: .utf8)
+                openBundle("com.yg.kirikinux2")
+                completion(.success(()))
+            } catch {
+                completion(.failure("启动标记写入失败: \(error.localizedDescription)"))
+            }
+            return
+        }
+
+        // ONScripter: 进程内 SDL2 会话
+        guard !isRunning else {
+            completion(.failure("已有游戏在运行，请先退出"))
             return
         }
 
@@ -64,6 +79,34 @@ final class GameSession {
         } else {
             completion(.failure(rc == -1 ? "引擎已在运行" : "启动失败（错误码 \(rc)），详见 TROUBLESHOOTING.md"))
         }
+    }
+
+    /// Kirikinux2 启动规则（与引擎 TVPCheckStartupArg 一致）:
+    /// 目录含 startup.tjs → 传目录；否则传第一个 xp3 文件路径
+    private func krkrLaunchMarker(for entry: GameEntry) throws -> String {
+        let fm = FileManager.default
+        let dirURL = URL(fileURLWithPath: entry.path)
+        let hasStartupTJS = (try? fm.contentsOfDirectory(atPath: entry.path))?.contains(where: {
+            $0.lowercased() == "startup.tjs"
+        }) ?? false
+
+        if hasStartupTJS {
+            return entry.path
+        }
+        if let xp3 = Scanner.shared.findFirstXp3(inDir: entry.path) {
+            return entry.path + "/" + xp3
+        }
+        return dirURL.path
+    }
+
+    /// 越狱环境私有 API: 拉起另一个 App（LSApplicationWorkspace）
+    private func openBundle(_ bundleID: String) {
+        guard let cls = NSClassFromString("LSApplicationWorkspace") as? NSObject.Type,
+              let workspace = cls.perform(NSSelectorFromString("defaultWorkspace"))?.takeUnretainedValue() as? NSObject else {
+            NSLog("[GalPlayer] LSApplicationWorkspace 不可用")
+            return
+        }
+        _ = workspace.perform(NSSelectorFromString("openApplicationWithBundleID:"), with: bundleID)
     }
 
     func stop() {

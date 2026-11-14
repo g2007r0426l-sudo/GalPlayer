@@ -76,3 +76,85 @@ targets:
       - sdk: CoreFoundation.framework
       - sdk: MobileCoreServices.framework
       - sdk: ImageIO.framework
+
+  # KRKR 引擎独立 App（cocos2d-x + Kirikiroid2 核心，双 App 架构）
+  Kirikinux2:
+    type: application
+    platform: iOS
+    sources:
+      - path: ../engines/kirikiroid2/ios_host/IOSMain.mm
+        createIntermediateGroups: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.yg.kirikinux2
+        INFOPLIST_FILE: "$(SRCROOT)/Kirikinux2-Info.plist"
+        CODE_SIGN_STYLE: Manual
+        CODE_SIGN_IDENTITY: ""
+        CODE_SIGNING_REQUIRED: "NO"
+        CODE_SIGNING_ALLOWED: "NO"
+        ENABLE_BITCODE: "NO"
+        TARGETED_DEVICE_FAMILY: "1,2"
+        ONLY_ACTIVE_ARCH: "NO"
+        ARCHS: "arm64"
+        CLANG_ENABLE_MODULES: "YES"
+        SWIFT_OBJC_BRIDGING_HEADER: ""
+        LIBRARY_SEARCH_PATHS:
+          - "$(SRCROOT)/../build/ios/lib"
+          - "$(SRCROOT)/../build/krkr-ios"
+        HEADER_SEARCH_PATHS:
+          - "$(SRCROOT)/../build/krkr-ios/include"
+          - "$(SRCROOT)/../engines/kirikiroid2/Kirikinux2/src/core"
+          - "$(SRCROOT)/../engines/kirikiroid2/Kirikinux2/cocos/kr2"
+          - "$(SRCROOT)/../engines/kirikiroid2/Kirikinux2/third_party/cocos2d-x"
+          - "$(SRCROOT)/../engines/kirikiroid2/Kirikinux2/third_party/cocos2d-x/cocos"
+          - "$(SRCROOT)/../engines/kirikiroid2/Kirikinux2/third_party/cocos2d-x/cocos/platform"
+          - "$(SRCROOT)/../engines/kirikiroid2/Kirikinux2/third_party/cocos2d-x/cocos/editor-support"
+          - "$(SRCROOT)/../engines/kirikiroid2/Kirikinux2/third_party/cocos2d-x/cocos/audio/include"
+          - "$(SRCROOT)/../engines/kirikiroid2/Kirikinux2/third_party/cocos2d-x/extensions"
+          - "$(SRCROOT)/../engines/kirikiroid2/Kirikinux2/third_party/cocos2d-x/external"
+        OTHER_CPLUSPLUSFLAGS:
+          - "-std=c++17"
+          - "-DTJS_TEXT_OUT_CRLF"
+          - "-D__STDC_CONSTANT_MACROS"
+          - "-DUSE_UNICODE_FSTRING"
+          - "-D_7ZIP_ST"
+          - "-DLINUX"
+          - "-DKR2_IOS"
+        OTHER_LDFLAGS:
+          - "-ObjC"
+          - "-Wl,-all_load"
+          - "-lc++"
+          - "-lkrkr2core"
+          - "-lkrkr2plugin"
+          - "-lkrkr2plugin_ext"
+          - "-lcocos2d"
+          - "-lSDL2_image"
+          - "-lSDL2_ttf"
+          - "-lSDL2_mixer"
+          - "-lSDL2stdlib"
+          - "-lSDL2"
+          - "-lfreetype"
+          - "-lvorbisfile"
+          - "-lvorbis"
+          - "-logg"
+          - "-liconv"
+          - "-lz"
+    frameworks:
+      - sdk: UIKit.framework
+      - sdk: Foundation.framework
+      - sdk: CoreGraphics.framework
+      - sdk: QuartzCore.framework
+      - sdk: OpenGLES.framework
+      - sdk: GLKit.framework
+      - sdk: Metal.framework
+      - sdk: MetalKit.framework
+      - sdk: OpenAL.framework
+      - sdk: AVFoundation.framework
+      - sdk: AudioToolbox.framework
+      - sdk: CoreAudio.framework
+      - sdk: CoreMotion.framework
+      - sdk: CoreText.framework
+      - sdk: CoreFoundation.framework
+      - sdk: ImageIO.framework
+      - sdk: MobileCoreServices.framework
+      - sdk: GameKit.framework
