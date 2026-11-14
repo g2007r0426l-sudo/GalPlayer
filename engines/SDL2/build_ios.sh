@@ -179,7 +179,15 @@ build_sdl_ext() {
         local lib=$(find "$ext_build" -name "libSDL2_$name.a" | head -n 1)
         if [ -n "$lib" ]; then
             cp -f "$lib" "$BUILD_ROOT/lib/libSDL2_$name.a"
-            [ -d "$ext_dir/include" ] && cp "$ext_dir"/include/*.h "$BUILD_ROOT/include/SDL2/" 2>/dev/null || true
+            if [ -d "$ext_dir/include" ]; then
+                cp "$ext_dir"/include/*.h "$BUILD_ROOT/include/SDL2/" 2>/dev/null || true
+            fi
+            # 老布局兜底: SDL_ttf 2.20 等把头文件放在仓库根目录
+            [ -f "$ext_dir/SDL_$name.h" ] && cp -f "$ext_dir/SDL_$name.h" "$BUILD_ROOT/include/SDL2/" || true
+            # 校验头文件确实就位
+            if [ ! -f "$BUILD_ROOT/include/SDL2/SDL_$name.h" ]; then
+                echo "[SDL2] WARNING: SDL_$name.h 头文件未找到！下游编译会失败"
+            fi
             cmake --install "$ext_build" --prefix "$BUILD_ROOT/prefix" >/dev/null 2>&1 || true
             echo "[SDL2] OK -> $BUILD_ROOT/lib/libSDL2_$name.a"
         else
