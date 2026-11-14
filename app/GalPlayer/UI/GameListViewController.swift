@@ -293,13 +293,12 @@ final class GameListViewController: UIViewController {
         if !searchText.isEmpty {
             list = list.filter { $0.name.localizedCaseInsensitiveContains(searchText) }
         }
-        // 能玩的排前面：大卡（继续上次）取 visible.first，就不会拿一个不可玩的当封面
-        list.sort { a, b in
-            let pa = EngineRegistry.shared.effectiveEngine(for: a).playable
-            let pb = EngineRegistry.shared.effectiveEngine(for: b).playable
-            if pa != pb { return pa }
-            return a.dirMtime > b.dirMtime
-        }
+        // 能玩的排前面（大卡「继续上次」取 visible.first），其余按当前模式原有的顺序
+        let registry = EngineRegistry.shared
+        let judge: (GameEntry) -> Bool = { registry.effectiveEngine(for: $0).playable }
+        let playableFirst = list.filter(judge)
+        let rest = list.filter { !judge($0) }
+        list = playableFirst + rest
         visible = list
         subtitleLabel.text = "\(visible.count) 部作品"
         collectionView.backgroundView?.isHidden = !visible.isEmpty
