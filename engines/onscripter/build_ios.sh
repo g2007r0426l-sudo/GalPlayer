@@ -112,13 +112,19 @@ if [ "${ONS_BUILD_OGG:-1}" = "1" ]; then
             -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0 -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF \
             -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DCMAKE_INSTALL_PREFIX="$PREFIX" -DINSTALL_DOCS=OFF >/dev/null
         cmake --build "$ROOT_DIR/build/ogg-ios" -j "$(sysctl -n hw.ncpu)" >/dev/null
-        cmake --install "$ROOT_DIR/build/ogg-ios" >/dev/null
-        # libvorbis: 用 CMAKE_PREFIX_PATH 指向 ogg 的安装位置
+        cmake --install "$ROOT_DIR/build/ogg-ios" >/dev/null || true
+        # 手动铺头文件（不依赖 cmake install 规则）
+        mkdir -p "$PREFIX/include/ogg"
+        cp -f "$OGGD"/include/ogg/*.h "$PREFIX/include/ogg/" 2>/dev/null || true
+        # libvorbis: 显式喂 ogg 库与头文件路径（FindOgg 不认 prefix 时兜底）
         cmake -S "$VORD" -B "$ROOT_DIR/build/vorbis-ios" -G Ninja \
             -DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_SYSROOT=iphoneos -DCMAKE_OSX_ARCHITECTURES=arm64 \
             -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0 -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DCMAKE_PREFIX_PATH="$PREFIX" -DBUILD_SHARED_LIBS=OFF >/dev/null
+            -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DCMAKE_PREFIX_PATH="$PREFIX" -DBUILD_SHARED_LIBS=OFF \
+            -DOGG_LIBRARY="$BUILD_ROOT/lib/libogg.a" -DOGG_INCLUDE_DIR="$OGGD/include" >/dev/null
         cmake --build "$ROOT_DIR/build/vorbis-ios" -j "$(sysctl -n hw.ncpu)" >/dev/null
+        mkdir -p "$PREFIX/include/vorbis"
+        cp -f "$VORD"/include/vorbis/*.h "$PREFIX/include/vorbis/" 2>/dev/null || true
         OGG_LIB=$(find "$ROOT_DIR/build/ogg-ios" -name "libogg.a" | head -n1)
         VOR_LIB=$(find "$ROOT_DIR/build/vorbis-ios" -name "libvorbis.a" | head -n1)
         VORF_LIB=$(find "$ROOT_DIR/build/vorbis-ios" -name "libvorbisfile.a" | head -n1)
