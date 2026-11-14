@@ -34,5 +34,12 @@ patch_all "SDL_EnableUNICODE"   's/[[:space:]]*SDL_EnableUNICODE([^;]*);//g'   "
 # 4) SDL_GetWMInfo —— 极少用到，删除调用
 patch_all "SDL_GetWMInfo" 's/[[:space:]]*SDL_GetWMInfo([^;]*);//g' "移除 SDL_GetWMInfo"
 
+# 5) SDL_WarpMouse —— SDL2 改为 SDL_WarpMouseInWindow(NULL, x, y)
+patch_all "SDL_WarpMouse\b" 's/SDL_WarpMouse\(/SDL_WarpMouseInWindow(NULL, /g' "SDL_WarpMouse -> SDL_WarpMouseInWindow"
+
+# 6) SDL_mutexP/V —— SDL2 改为 SDL_LockMutex/SDL_UnlockMutex
+patch_all "SDL_mutexP\b" 's/SDL_mutexP\(/SDL_LockMutex(/g' "SDL_mutexP -> SDL_LockMutex"
+patch_all "SDL_mutexV\b" 's/SDL_mutexV\(/SDL_UnlockMutex(/g' "SDL_mutexV -> SDL_UnlockMutex"
+
 echo "[ONS-patch] 完成。orig 备份已保留在源码目录（*.orig）。"
 exit 0
