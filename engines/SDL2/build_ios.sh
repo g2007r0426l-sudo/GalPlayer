@@ -149,7 +149,7 @@ build_sdl_ext() {
             -DSDL2_INCLUDE_DIR="$BUILD_ROOT/include/SDL2" \
             -DBUILD_TESTING=OFF -DSDL2IMAGE_SAMPLES=OFF -DSDL2IMAGE_TESTS=OFF \
             -DCMAKE_INSTALL_PREFIX="$BUILD_ROOT/prefix" \
-            "${extra_flags[@]}"
+            ${extra_flags[@]+"${extra_flags[@]}"}
         cmake --build "$ext_build" -j "$(sysctl -n hw.ncpu)"
         local lib=$(find "$ext_build" -name "libSDL2_$name.a" | head -n 1)
         if [ -n "$lib" ]; then
