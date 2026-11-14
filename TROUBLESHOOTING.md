@@ -1,5 +1,19 @@
 # TROUBLESHOOTING — 排障手册
 
+## 零、架构速览（先看这个）
+
+安装后桌面会出现**两个图标**：
+
+| App | 作用 |
+|---|---|
+| **GalPlayer** | 主界面：扫描游戏库、识别引擎、播放 ONScripter 游戏（进程内 SDL2 会话） |
+| **Kirikinux2** | KRKR 引擎：cocos2d-x + Kirikiroid2 核心，点 GalPlayer 里的 KRKR 游戏会自动拉起它并直接进游戏 |
+
+**KRKR 启动流程**：GalPlayer 把游戏路径写入
+`/var/mobile/Documents/Galgames/.krkr_launch` → 拉起 Kirikinux2 → 引擎读取该文件后
+一次性消费（删除）并自动加载游戏。若 Kirikinux2 不存在（构建时 KRKR 未编译成功），
+点 KRKR 游戏会提示"启动失败"——此时只能用 ONScripter 游戏。
+
 ## 一、闪退 / 启动即崩
 
 **第一件事：看崩溃日志**
