@@ -52,6 +52,7 @@ settings:
       - "-lSDL2_mixer"
       - "-lSDL2stdlib"
       - "-liconv"
+      - "-lbz2"
       - "-lz"
     OTHER_CPLUSPLUSFLAGS:
       - "-std=c++14"
@@ -64,6 +65,7 @@ targets:
       - path: GalPlayer
         excludes:
           - "Info.plist"
+          - "Bridges/KrkrBridge.mm"   # KRKR 走独立 App，主 App 内不编译
     # SDL2 在 iOS 上需要的系统框架
     frameworks:
       - sdk: UIKit.framework

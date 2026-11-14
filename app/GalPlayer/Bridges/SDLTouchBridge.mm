@@ -361,6 +361,19 @@ float fastForwardIntervalMs(float textSpeed) {
 } // namespace gp
 
 // ============================================================================
+// KRKR 启动桩 —— KRKR 引擎由独立 App（com.yg.kirikinux2）承载，
+// 主 App 内不走进程内启动路径（GameSession 通过标记文件 + LSApplicationWorkspace 拉起）。
+// 若未来恢复进程内 KRKR，请把 Bridges/KrkrBridge.mm 重新加入 target 并删除本桩。
+// ============================================================================
+namespace gp {
+int launchKrkr(LaunchCtx ctx) {
+    (void)ctx;
+    fprintf(stderr, "[GP] KRKR 引擎由独立 App 提供（标记文件流程），进程内启动不可用\n");
+    return -9;
+}
+} // namespace gp
+
+// ============================================================================
 // GP_* C API 分发
 // ============================================================================
 extern "C" int GP_EngineStart(int kind,

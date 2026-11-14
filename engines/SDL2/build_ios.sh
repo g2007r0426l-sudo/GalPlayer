@@ -73,13 +73,23 @@ cmake --build "$BUILD_DIR" -j "$(sysctl -n hw.ncpu)"
 # ---------------------------------------------------------------------------
 # 3. 收集产物
 # ---------------------------------------------------------------------------
-LIB=$(find "$BUILD_DIR" -name "libSDL2*.a" -not -name "*pic*" | head -n 1)
+LIB=$(find "$BUILD_DIR" -name "libSDL2.a" | head -n 1)
+if [ -z "$LIB" ]; then
+    # 兜底: 排除 SDL2main/SDL2_test，避免拷错成 main 库（会导致核心符号全缺）
+    LIB=$(find "$BUILD_DIR" -name "libSDL2*.a" | grep -vE "libSDL2(main|_test|test)\\.a" | head -n 1)
+fi
 if [ -z "$LIB" ]; then
     echo "[SDL2] ERROR: 未找到 libSDL2.a，构建目录: $BUILD_DIR"
     find "$BUILD_DIR" -name "*.a" | head -n 20
     exit 1
 fi
+echo "[SDL2] 选用核心库: $LIB ($(ls -lh "$LIB" | awk '{print $5}'))"
 cp -f "$LIB" "$BUILD_ROOT/lib/libSDL2.a"
+# 校验符号确实存在（防止拷到 main 库）
+if ! nm -gU "$BUILD_ROOT/lib/libSDL2.a" 2>/dev/null | grep -q " _SDL_Init$"; then
+    echo "[SDL2] ERROR: libSDL2.a 缺少 SDL_Init 符号，可能拷错文件"
+    exit 1
+fi
 
 # 头文件: 必须用构建目录里 CMake 生成的 SDL_config.h（源码模板版会导致 Sint64 断言失败）
 rm -rf "$BUILD_ROOT/include/SDL2"
