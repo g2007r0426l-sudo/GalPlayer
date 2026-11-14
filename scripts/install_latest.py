@@ -20,12 +20,20 @@ def gh(path):
                                  headers={"Authorization": "Bearer " + token, "User-Agent": "GalPlayer"})
     return urllib.request.urlopen(req, timeout=60).read()
 
-runs = __import__("json").loads(gh(f"/repos/{REPO}/actions/workflows/build.yml/runs?per_page=1"))
-run = runs["workflow_runs"][0]
+runs = __import__("json").loads(gh(f"/repos/{REPO}/actions/workflows/build.yml/runs?per_page=5"))
+run = None
+art = None
+for cand in runs["workflow_runs"]:
+    if cand.get("conclusion") != "success":
+        continue
+    arts = __import__("json").loads(gh(f"/repos/{REPO}/actions/runs/{cand['id']}/artifacts"))["artifacts"]
+    hit = next((a for a in arts if a["name"] == "galplayer-deb"), None)
+    if hit:
+        run, art = cand, hit
+        break
+if not art:
+    raise SystemExit("没有找到可用的 galplayer-deb 产物")
 print(f"[CI] run {run['id']} {run['head_sha'][:7]} {run['conclusion']}")
-arts = __import__("json").loads(gh(f"/repos/{REPO}/actions/runs/{run['id']}/artifacts"))["artifacts"]
-art = next(a for a in arts if a["name"] == "galplayer-deb")
-print(f"[CI] 下载 {art['size_in_bytes']:,} bytes")
 
 class NoRedir(urllib.request.HTTPRedirectHandler):
     def redirect_request(self, *a, **k): return None

@@ -1,147 +1,145 @@
-# PORTING_NOTES — 引擎整合技术细节
+# GalPlayer 移植要点（实战记录）
 
-## 1. 统一 SDL2 运行时
+> 全部结论来自真机（iPad Pro 10.5 / iPadOS 17.5.1 / palera1n rootless）实测，
+> 不是理论推测。踩过的坑与对应解法都记在这里。
 
-两个引擎都跑在**同一份** libSDL2.a 上（iOS UIKit 后端）：
+---
 
-- 构建顺序: `engines/SDL2/build_ios.sh` 最先执行。若 Kirikiroid2 仓库自带 SDL2 fork
-  （顶层 `SDL2/` 目录含 CMakeLists），则优先用它 —— Kirikiroid2 的渲染/音频层是围绕
-  自己 fork 写的，统一 fork 可避免其核心与上游 SDL2 的 API 漂移；ONScripter 兼容层
-  面向标准 SDL2 API，两种 fork 均可工作。
-- **绝不同时链接两份 SDL**（符号冲突必炸），这是把 ONS 与 KRKR 都指向同一库的原因。
-- iOS 17: SDL2 2.26+ 支持 UIWindowScene；构建脚本从 release-2.30.x 起尝试。
+## 一、架构：为什么是「三个 App」
 
-## 2. 引擎启动模型（引擎线程 + SDL_UIKitRunApp）
-
-SDL2 iOS 后端的标准启动路径是 `SDL_UIKitRunApp(argc, argv, mainFunc)`：
-它负责 UIApplicationDelegate 挂接、场景管理、UIKit 主线程与引擎线程的隔离。
-因此桥接层（`Bridges/SDLTouchBridge.mm`）把引擎入口放到独立线程，经
-`SDL_UIKitRunApp` 进入；引擎 `main` 由编译期 `-Dmain=<引擎名>_entry/ons_main` 重命名。
-
-- 退出：推送 `SDL_QUIT` → 引擎走自身退出路径 → `SDL_UIKitRunApp` 返回 →
-  `onsdl_compat_shutdown()`（ONS）→ Swift 收到 stopped 回调 → 主窗口重新 makeKeyAndVisible。
-- 反复进出：SDL_UIKitRunApp 每次 SDL_Init/SDL_Quit 完整成对；兼容层在 SDL_QUIT
-  事件观察器里自拆窗口/渲染器/纹理；触控状态在会话边界重置。
-
-## 3. 触控三件套（App 层统一语义）
-
-- **ONScripter**: `SDL_HINT_TOUCH_MOUSE_EVENTS=0` 关掉系统级手指→鼠标合成，
-  由 `SDLTouchBridge.mm` 自己映射（事件观察器 + 监控线程）：
-  - 单指 down → 鼠标移动 + 左键 down；up → 左键 up（= 单击推进）
-  - 双指在 400ms 内轻点 → 右键 down/up（= 呼出引擎菜单）
-  - 单指按住 ≥450ms → 结束原始按压 → **Ctrl 按住**（ONScripter 的 skip 语义）
-    + 周期左键连点（间隔 = 160ms/文字速度，0.25x→640ms，4x→40ms）= 持续快进
-- **Kirikiri**: `touchToMouse=false`，Kirikiroid2 自带 SDL 触控处理
-  （单击推进/双指右键菜单/长按跳过），与 App 层手势约定一致，直接走引擎原生路径。
-
-> 若实机发现 Kirikiroid2 原生触控在某 SDL fork 上失效，把 `KrkrBridge.mm` 里
-> `ctx.touchToMouse = false` 改为 `true` 即可切到 App 层映射（一键兜底）。
-
-## 4. ONScripter 为什么走"兼容层"而不是改源码
-
-### 4.1 实测得到的 SDL1.2 → SDL2 兼容矩阵（全部经过 iOS 真机链路编译验证）
-
-**shim 层（`engines/onscripter/sdl2_compat/onsdl_compat.h`，零源码改动）**
-
-| SDL1.2 符号 | SDL2 处理 |
+| App | 角色 |
 |---|---|
-| `SDL_SetVideoMode` / `SDL_GetVideoSurface` / `SDL_Flip` / `SDL_UpdateRect(s)` | 自研 compat 实现（SDL_Window + SDL_Renderer + ARGB8888 流式纹理） |
-| `SDL_SetAlpha` | `SDL_SetSurfaceAlphaMod` + `SDL_SetSurfaceBlendMode` |
-| `SDL_WM_SetCaption` / `SDL_WM_GetCaption` | `SDL_SetWindowTitle` |
-| `SDL_EnableUNICODE` / `SDL_EnableKeyRepeat` / `SDL_GetWMInfo` | 空桩 |
-| `SDL_ListModes` / `SDL_GetVideoInfo` / `SDL_SetGamma` | 桩（返回 NULL / 静态结构 / 0） |
-| `SDL_Overlay`（YUV 视频帧） | 结构体类型定义（仅编译需要；smpeg/ANDROID 宏内不执行） |
-| `SDL_GetAppState` | 桩（恒返回前台聚焦） |
-| `SDL_WM_ToggleFullScreen` | 宏替换为 `(0)` |
-| `SDLKey` | `typedef SDL_Keycode SDLKey` |
-| `SDL_BUTTON_WHEELUP/DOWN` | 常量 4/5（iOS 无滚轮，仅供编译） |
-| `SDL_VIDEOEXPOSE` | 保留事件值 0x7F00（SDL 永不产生，运行期不可达） |
+| **GalPlayer** | 纯 Swift/UIKit 界面：扫描游戏库、识别引擎、设置 |
+| **OnsPlayer** | ONScripter 播放器（SDL2 生命周期自持） |
+| **Kirikinux2** | Kirikiri2 播放器（cocos2d-x，二期） |
 
-**源码补丁层（`patch_ons_sources.py`，Python 确定性替换 + 自动备份）**
+### 1.1 不能在主 App 里进程内启动 SDL
 
-| 原符号 | 替换 | 原因 |
+最初设计是在 GalPlayer 进程里用后台线程调 `SDL_UIKitRunApp`，真机直接崩：
+
+```
+UIApplicationMain            ← 重复调用
+SDL_UIKitRunApp
+gp::engineThreadMain
+→ UIApplicationInstantiateSingleton 抛异常 → SIGABRT
+```
+
+`SDL_UIKitRunApp` 内部会调 `UIApplicationMain`，**一个进程只能调一次、必须在主线程**。
+因此引擎必须独占一个 App 生命周期：GalPlayer 写标记文件 → `LSApplicationWorkspace`
+拉起播放器 → 播放器读标记（一次性消费）后进游戏。
+
+---
+
+## 二、GPU 不可用：UIKit 直贴像素
+
+真机探针结果（这是本项目最关键的发现）：
+
+```
+probe MTLDevice=nil
+driver[0]=metal      → Failed to obtain Metal device
+driver[1]=opengles2  → GL ES 2 context could not be created
+driver[2]=opengles   → GL ES 1 context could not be created
+```
+
+**当前越狱环境下 App 进程拿不到 GPU 直连**（Metal/GLES 全部失败），
+但 CoreAnimation 合成是系统代办的，所以 UIKit 界面照常显示。
+
+### 解法：presenter 回退链路
+
+```
+引擎像素 (ARGB8888)
+   ↓  onsdl_set_presenter 回调
+CGImage(CGBitmapContextCreateImage, kCGImageAlphaPremultipliedFirst|32Little)
+   ↓
+CALayer.contents  ← 系统合成器直接上屏，全程不需要 GPU 客户端
+```
+
+- 兼容层先尝试 metal → opengles2 → opengles → software
+- 全部失败且已注册 presenter 时，`g_usePresenter = true`，`SetVideoMode` 仍返回合法 surface
+- 触摸不再依赖 SDL 的事件通道：自建 `UIWindow`（层级高于 SDL 窗口）+ 自绘视图，
+  触摸直接合成 `SDL_MouseButtonEvent` 推进引擎事件队列
+  - 单击 = 左键推进
+  - 双指轻点 = 右键（呼出菜单）
+  - 长按 ≥450ms = 按住 Ctrl + 连点（快进）
+
+---
+
+## 三、ONScripter 接入细节
+
+### 3.1 参数陷阱
+
+`onscripter_main.cpp` 的参数循环**只接受 `-` 开头的选项**，传裸目录会走
+`optionHelp()` → `exit(0)`。而我们已经在入口 `chdir()` 到游戏目录，
+所以启动时不传任何参数（引擎自己按 `0.txt` → `00.txt` → `nscript.dat` → `nscript.___` 顺序探测）。
+
+### 3.2 exit() 与静态线程
+
+`optionHelp()` 里的 `exit()` 会跑静态析构；若此时还有 joinable 的
+`static std::thread`，会触发 `std::terminate` → `abort`。
+→ 监控线程改为堆分配 + `detach()`。
+
+### 3.3 字体
+
+引擎缺 TTF 会直接报 `can't open font file: default.ttf` 并退出。
+做法：包内带 `DroidSansFallback.ttf`，启动时以 `-f <包内路径>` 传给引擎；
+若游戏目录自带 `default.ttf` 则不传（尊重作者字体）。
+
+> 踩坑：`fetch_fonts.sh` 的 `ROOT_DIR` 少算一级，字体被下到 `engines/app/...`，
+> 导致 App 包里根本没有字体（表现为 `font candidates=1`）。
+
+### 3.4 默认编码改为 UTF-8
+
+真机日志：`ONScripter version 20230825(2.96)` 之后默认 `CODE_CP932`，
+实测日文脚本被解成半角片假名乱码。改为默认 `CODE_UTF8` 后：
+
+```
+`こんにちは　ギャルゲー     ✅
+`中文测试 中文测试          ✅
+`ABCabc 123                ✅
+```
+
+> 注意：UTF-8 模式下文本标记不是反引号，实际游戏用各自正确的标记即可。
+> 纯 Shift-JIS 老游戏如需原样运行，可把脚本转成 UTF-8 再用（编码转换不改变剧情内容）。
+
+---
+
+## 四、构建链上的硬坑
+
+| 现象 | 真因 | 解法 |
 |---|---|---|
-| `keysym.unicode` | `keysym.sym` | SDL2 移除 unicode 字段 |
-| `SDL_ACTIVEEVENT` / `event.active.*` | `SDL_WINDOWEVENT` / `event.window.data*` | 事件模型变更 |
-| `SDL_WarpMouse(` | `SDL_WarpMouseInWindow(NULL, ` | 函数改名 |
-| `SDL_mutexP(` / `SDL_mutexV(` | `SDL_LockMutex(` / `SDL_UnlockMutex(` | 宏移除 |
-| `SDLK_KP0..9` | `SDLK_KP_0..9` | 键名加下划线 |
-| `Mix_LoadMUS_RW(x)` | `Mix_LoadMUS_RW(x, 1)` | SDL_mixer 2.8 签名变更 |
+| `Sint64 == 4` 静态断言 / `unknown type name size_t` | SDL 用了源码模板 `SDL_config.h` | 强制用 CMake 生成版，并 `grep HAVE_STDINT_H` 校验 |
+| `SDL_strcmp/SDL_strlen` 未定义 | SDL2 静态库未含 stdlib 符号 | 单独编 `libSDL2stdlib.a`（后来改用正确的 libSDL2.a 后不再需要） |
+| 链接报 126 个重复符号 | `-all_load` 同时加载 stdlib 备份库与 SDL2 本体 | 移除 `-lSDL2stdlib` |
+| `libSDL2.a` 里没有 SDL_Init | `find libSDL2*.a` 拷贝到了 `libSDL2main.a` | 精确按文件名取 `libSDL2.a` |
+| `ldid.cpp(3332) _assert errno=2` | `sign.sh` 硬编码 `GalPlayer` 二进制名 | 从 `CFBundleExecutable` 读取 |
+| `unbound variable: APP` / `COMMIT` | 全角括号紧贴 `$VAR`，bash 把括号算进变量名 | 一律写 `${VAR}` |
+| `dpkg-deb: tar --warning=no-timestamp not supported` | 设备自带 tar 太老 | 打包在 CI 完成；装机改走 tar 流式上传 + 手工签名 + uicache |
+| `Parsing project spec failed` | YAML 里用 `;` 分隔多个值 | 每个值单独一行 |
 
-**⚠ 血泪教训**：`sed -i '' -E` 在 macOS runner 上会**静默失败**（补丁打印成功但文件未改）。
-改为 Python 字符串替换后一次通过 —— 任何跨平台补丁脚本都应避免 shell sed 方言。
+---
 
-### 4.2 构建依赖清单（实测）
+## 五、装机（免 dpkg）
 
-`SDL2`（`SDL_LIBC` 保持默认；`SDL_config.h` 必须用 **CMake 生成版**，源码模板版会导致
-`Sint64` 断言失败）· `SDL_image`（`SDL2IMAGE_BACKEND_IMAGEIO=OFF` + `STB=ON`）·
-`SDL_ttf`（`SDL2TTF_VENDORED=ON`，头文件在 2.20 的仓库根部）·
-`SDL_mixer`（关 OPUS/MOD/MIDI/WAVPACK，保留 WAV/OGG/FLAC/MP3 内置解码）·
-`libjpeg-turbo`（`CMAKE_SYSTEM_PROCESSOR=arm64` 必传）· `libogg/libvorbis/libvorbisfile` · `freetype`
+设备 `dpkg` 依赖的 `tar` 太老会失败，改为等价手工流程：
 
-## 5. Kirikiroid2 构建脚本的自适应设计
+1. 本地解 `.deb`：ar → `data.tar.gz` → 解出 `*.app`
+2. tar 流式上传到 `/var/jb/Applications/`
+3. `chown -R root:wheel` + `chmod -R 755`
+4. 逐文件 `ldid -S`（只签主程序会崩：`mapped file has no cdhash`）
+5. `uicache -p <app>` 注册图标
+6. `uiopen -b com.yg.galplayer` 启动
 
-官方 ONScripter（含 JH）基于 SDL 1.2。方案对比：
+脚本：`scripts/install_latest.py`（自动下载最新成功产物并完成以上全部步骤）。
 
-| 方案 | 结论 |
+---
+
+## 六、当前状态
+
+| 能力 | 状态 |
 |---|---|
-| 引擎源码大改迁 SDL2 | 侵入面大、每个版本都要重做 |
-| 换 SDL2 系 fork（如 PONScripter） | CJK/GBK 编码链路与 JH 行为有差异，风险高 |
-| **include 垫片 + 少量带守卫补丁（采用）** | 引擎源码零修改（仅 3 类机械替换），兼容层约 300 行，可控可修 |
-
-兼容层覆盖面（引擎实际使用集）：`SDL_SetVideoMode / SDL_GetVideoSurface /
-SDL_Flip / SDL_UpdateRect(s) / SDL_WM_SetCaption / SDL_SetAlpha /
-SDL_EnableUNICODE / SDL_EnableKeyRepeat / SDL_ListModes / SDL_GetVideoInfo /
-SDL_SetGamma` + SDL1.2 surface 标志常量。音频走 SDL2 保留的 legacy
-`SDL_OpenAudio` 系列，无需垫片。
-
-**屏幕适配实现**：兼容层拥有 renderer —— 原始比例 = `SDL_RenderSetLogicalSize(w,h)`
-（自动居中黑边）；拉伸全屏 = 取消逻辑尺寸直接铺满。Kirikiri 侧由 Kirikiroid2
-原生等比缩放（stretch 模式一期不作用于 KRKR，属已知限制）。
-
-**机械补丁**（`patch_ons_sources.sh`，全部 grep 守卫 + 备份 .orig）：
-1. `keysym.unicode` → `keysym.sym`（SDL2 移除 unicode 字段）
-2. `SDL_ACTIVEEVENT`/`event.active.*` → `SDL_WINDOWEVENT`/`event.window.*`
-3. 移除直连的 `SDL_EnableKeyRepeat/SDL_EnableUNICODE/SDL_GetWMInfo` 调用
-
-## 5. Kirikiroid2 构建脚本的自适应设计
-
-无法在编写时假设上游目录布局永不变，脚本做了：
-
-- **doctor 输出**：clone 后打印顶层目录，人工一眼可查
-- **平台目录排除**：`windows|win32|project/jni|android|wii|psp` 等目录不参与编译
-- **include 目录自动收集**：把仓库内所有含 .h 的目录加进 -I（kirikiri 头文件扁平分散）
-- **入口自动探测**：grep `int main(` 找到入口 TU 后用 `-Dmain=krkr_entry` 重命名；
-  多个 TU 含 main 时打印全部，编译失败时输出前 30 行错误 + 修复指引
-- 若核心依赖仓库内置 third_party（boost/oniguruma 等），按报错提示把对应目录补进 INCS
-
-## 6. 存档落盘
-
-引擎线程 `chdir(游戏目录)` 后启动：
-- ONScripter → `save.dat` 写在 cwd = 游戏目录
-- Kirikiri → KAG `savedata/` 写在游戏目录
-- 目录属主为 mobile，App 以 mobile 运行，直接可写（越狱环境无沙盒限制）
-
-## 7. 已知限制（MVP 一期）
-
-| 项 | 说明 |
-|---|---|
-| Kirikiri 拉伸全屏 | 一期走引擎原生等比（Kirikiroid2 未暴露拉伸入口）；ONS 完整支持两模式 |
-| 设置页"文字速度" | 映射为长按快进节奏（两引擎统一）；游戏内逐字速度由引擎自带菜单调节 |
-| ONS MP3/视频 | smpeg 未编入（MP3/OGM 无声无画面）；NWA/WAV/OGG 正常 |
-| 16bpp 直绘路径 | 兼容层统一 32bpp ARGB8888，极少数按 16bpp 写死的游戏花屏 → 后续按需补 |
-| Kirikiri xp3 filter | 私有加密 xp3（带自定义 filter 的游戏）一期不支持 |
-| SDL_UIKitRunApp 与自定义 AppDelegate | SDL 会接管生命周期回调；横屏由 Info.plist + AppDelegate 双保险 |
-
-## 8. 实机验收对照表（§6 验收标准）
-
-| # | 验收项 | 状态 |
-|---|---|---|
-| 1 | KRKR 游戏入目录→列表→全屏运行→有声→存档 | 代码路径完成，待实机跑 |
-| 2 | ONS 游戏（nscript.dat）同流程 | 代码路径完成，待实机跑 |
-| 3 | 5 个游戏（含 root.pfs）分类正确，Artemis 标灰 | Scanner 已实现 |
-| 4 | 触控三件套 | SDLTouchBridge 已实现 |
-| 5 | 全局设置三项真实生效 | 适配(ONS)/快进节奏/音量(MPVolumeView) 已实现 |
-| 6 | .deb Filza 安装、图标出现/消失 | packaging 齐备（postinst/postrm） |
-| 7 | 反复进出 5 次不崩不漏 | 兼容层自拆 + SDL_Quit 成对；用 Xcode Memory Graph 实测 |
-| 8 | 无网络请求 | 全工程无网络调用；Instruments/Proxyman 验证 |
+| 可爱 UI（侧边栏/大卡/网格/搜索/设置） | ✅ 真机可用 |
+| 二次元封面（8 张内置图池 + 横版大卡图） | ✅ |
+| App 图标 | ✅ |
+| ONScripter 引擎：视频/音频/文字/触摸 | ✅ 真机验证 |
+| .deb 打包（双 App） | ✅（15MB） |
+| Kirikiri2 引擎 | 🔄 二期（cocos2d-x iOS 平台层） |
