@@ -1,71 +1,45 @@
 # =============================================================================
-# Kirikinux2 iOS 构建清单 —— 基于 Kirikinux2 的 Linux CMakeLists 移植
+# Kirikinux2 iOS 构建清单 v2 —— 基于 Kirikinux2 的 Linux CMakeLists 移植
 #
-# 产物（全部静态库，输出到 CMAKE_BINARY_DIR）:
-#   libkrkr2core.a      引擎核心（TJS2/存储/图层/声音/UI 界面）
-#   libkrkr2plugin.a    内置插件
-#   libkrkr2plugin_ext.a  KrKr2 移植插件
-#   libcocos2d.a        cocos2d-x 3.17.2（iOS 平台，含音频/输入/GL）
+# 产物（静态库）:
+#   libkrkr2core.a / libkrkr2plugin.a / libkrkr2plugin_ext.a / libcocos2d.a
+#   libkr2_7zip.a / libkr2_unrar.a
 #
-# App 目标（Xcode, com.yg.kirikinux2）链接以上库 + ios_host/IOSMain.mm。
+# App 目标（Xcode, com.yg.kirikinux2）链接以上库 + platform/ios/IOSMain.mm。
+# 与 Linux 版差异: 无 FFmpeg（视频 stub）、无 GTK/Fontconfig、无 OpenCV、
+#                  无 blend2d（layerExDraw 排除）、OpenAL 用系统框架。
 # =============================================================================
 cmake_minimum_required(VERSION 3.20)
 project(Kirikinux2-iOS CXX C OBJC OBJCXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(THREADS_PREFER_PTHREAD_FLAG ON)
+find_package(Threads REQUIRED)
+find_package(ZLIB REQUIRED)
 
-# ---- 输入（由 build_ios.sh 以缓存变量传入） ----
-#   KR2_ROOT        Kirikinux2 源码树
-#   KR2_COCOS2DX_ROOT  已 patch 的 cocos2d-x 3.17.2 源码树
-#   KR2_THIRD_PARTY    第三方依赖目录
+# ---- 输入（build_ios.sh 以缓存变量传入） ----
+if(NOT KR2_ROOT)
+  message(FATAL_ERROR "KR2_ROOT 未设置")
+endif()
+if(NOT KR2_COCOS2DX_ROOT)
+  set(KR2_COCOS2DX_ROOT "${KR2_ROOT}/third_party/cocos2d-x")
+endif()
+if(NOT KR2_THIRD_PARTY)
+  set(KR2_THIRD_PARTY "${KR2_ROOT}/third_party")
+endif()
 
-message(STATUS "[KR2-IOS] KR2_ROOT=${KR2_ROOT}")
-message(STATUS "[KR2-IOS] COCOS=${KR2_COCOS2DX_ROOT}")
-
+# ---- cocos2d-x（iOS 平台分支由其自身 CMake 处理） ----
 if(NOT EXISTS "${KR2_COCOS2DX_ROOT}/cocos/cocos2d.h")
   message(FATAL_ERROR "cocos2d-x not found in ${KR2_COCOS2DX_ROOT}")
 endif()
-
 set(BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(BUILD_LUA_LIBS OFF CACHE BOOL "" FORCE)
 set(BUILD_JS_LIBS OFF CACHE BOOL "" FORCE)
 set(COCOS2DX_ROOT_PATH "${KR2_COCOS2DX_ROOT}")
 list(APPEND CMAKE_MODULE_PATH "${COCOS2DX_ROOT_PATH}/cmake/Modules/")
 include(CocosBuildSet)
-add_subdirectory("${COCOS2DX_ROOT_PATH}/cocos" "${CMAKE_BINARY_DIR}/cocos/core")
-
-# ---- 平台源文件（iOS 宿主替代 platform/linux/*） ----
-set(KR2_PLATFORM_SOURCES
-  ${KR2_ROOT}/platform/ios/IOSUtils.cpp
-  ${KR2_ROOT}/platform/ios/KR2IOSStubs.cpp)
-
-include(${KR2_ROOT}/cmake/Kr2Sources.cmake)
-
-# iOS MVP 排除: ffmpeg 视频解码（stub，BPG/JXR/XP3Repack 同 Linux 排除集）
-list(REMOVE_ITEM KR2_CORE_SOURCES ${KR2_FFMPEG_USERS})
-
-set(KR2_CORE_INCLUDE_DIRS
-  ${KR2_ROOT}/platform/ios/compat
-  ${KR2_CORE}
-  ${KR2_CORE}/base
-  ${KR2_CORE}/base/win32
-  ${KR2_CORE}/environ
-  ${KR2_CORE}/environ/win32
-  ${KR2_CORE}/environ/sdl
-  ${KR2_CORE}/msg
-  ${KR2_CORE}/msg/win32
-  ${KR2_CORE}/extension
-  ${KR2_CORE}/sound
-  ${KR2_CORE}/sound/win32
-  ${KR2_CORE}/tjs2
-  ${KR2_CORE}/utils
-  ${KR2_CORE}/utils/win32
-  ${KR2_CORE}/visual
-  ${KR2_CORE}/visual/ARM
-  ${KR2_CORE}/visual/win32
-  ${KR2_ROOT}/src/plugins
-  ${KR2_ROOT}/cocos/kr2)
+add_subdirectory("${KR2_COCOS2DX_ROOT}/cocos" "${CMAKE_BINARY_DIR}/cocos/core")
 
 set(KR2_COCOS_INCLUDE_DIRS
   "${KR2_COCOS2DX_ROOT}"
@@ -76,46 +50,124 @@ set(KR2_COCOS_INCLUDE_DIRS
   "${KR2_COCOS2DX_ROOT}/extensions"
   "${KR2_COCOS2DX_ROOT}/external")
 
-set(KR2_COMMON_OPTIONS
-  -fno-delete-null-pointer-checks
-  -Wno-deprecated-declarations
-  -Wno-unused-result
-  -Wno-inconsistent-missing-override
-  -Wno-nullability-completeness
-  -Wno-shorten-64-to-32)
+# ---- 平台源文件（iOS 宿主替代 platform/linux/*） ----
+set(KR2_PLATFORM_SOURCES
+  ${KR2_ROOT}/platform/ios/IOSUtils.cpp
+  ${KR2_ROOT}/platform/ios/KR2IOSStubs.cpp)
 
-# 与 src/core/Android.mk 相同的定义集（LINUX 保留: 走 POSIX 分支，iOS 与之一致）
-set(KR2_COMMON_DEFINITIONS TJS_TEXT_OUT_CRLF __STDC_CONSTANT_MACROS USE_UNICODE_FSTRING _7ZIP_ST LINUX KR2_IOS)
+include(${KR2_ROOT}/cmake/Kr2Sources.cmake)
+
+# 排除 FFmpeg 视频解码用户源（无 ffmpeg）
+list(REMOVE_ITEM KR2_CORE_SOURCES ${KR2_FFMPEG_USERS})
+
+# ---- 7zip（XP3 解压所需 LZMA SDK C 代码） ----
+set(KR2_7ZIP_ROOT "${KR2_THIRD_PARTY}/7zip")
+if(EXISTS "${KR2_7ZIP_ROOT}/C/7z.h")
+  set(_kr2_7z_c)
+  foreach(f 7zArcIn 7zBuf 7zCrc 7zCrcOpt 7zDec 7zStream Alloc Bcj2 Bra Bra86 BraIA64 CpuArch Delta Lzma2Dec LzmaDec Ppmd7 Ppmd7Dec)
+    if(EXISTS "${KR2_7ZIP_ROOT}/C/${f}.c")
+      list(APPEND _kr2_7z_c "${KR2_7ZIP_ROOT}/C/${f}.c")
+    endif()
+  endforeach()
+  add_library(kr2_7zip STATIC ${_kr2_7z_c})
+  target_compile_definitions(kr2_7zip PUBLIC _7ZIP_ST)
+  target_include_directories(kr2_7zip PUBLIC "${KR2_THIRD_PARTY}" PRIVATE "${KR2_7ZIP_ROOT}/C")
+  set_target_properties(kr2_7zip PROPERTIES POSITION_INDEPENDENT_CODE ON)
+  set(KR2_HAVE_7ZIP ON)
+else()
+  message(WARNING "7zip 源码缺失（${KR2_7ZIP_ROOT}），XP3 解压可能不可用")
+  set(KR2_HAVE_7ZIP OFF)
+endif()
+
+# ---- unrar（.rar 归档支持，可选） ----
+set(KR2_UNRAR_DIR "${KR2_THIRD_PARTY}/unrar")
+if(EXISTS "${KR2_UNRAR_DIR}/dll.hpp")
+  set(_kr2_unrar_src)
+  foreach(f rar strlist strfn pathfn smallfn global file filefn filcreat archive arcread unicode system
+            isnt crypt crc rawread encname resource match timefn rdwrfn consio options errhnd rarvm
+            secpassword rijndael getbits sha1 sha256 blake2s hash extinfo extract volume list find
+            unpack headers threadpool rs16 cmddata ui filestr scantree dll qopen)
+    if(EXISTS "${KR2_UNRAR_DIR}/${f}.cpp")
+      list(APPEND _kr2_unrar_src "${KR2_UNRAR_DIR}/${f}.cpp")
+    endif()
+  endforeach()
+  add_library(kr2_unrar STATIC ${_kr2_unrar_src})
+  target_compile_definitions(kr2_unrar PRIVATE RARDLL _FILE_OFFSET_BITS=64 _LARGEFILE_SOURCE)
+  target_compile_options(kr2_unrar PRIVATE -Wno-logical-op-parentheses -Wno-switch -Wno-dangling-else)
+  target_include_directories(kr2_unrar PUBLIC "${KR2_THIRD_PARTY}")
+  target_link_libraries(kr2_unrar PUBLIC Threads::Threads)
+  set_target_properties(kr2_unrar PROPERTIES POSITION_INDEPENDENT_CODE ON)
+  set(KR2_HAVE_UNRAR ON)
+else()
+  message(WARNING "unrar 源码缺失（${KR2_UNRAR_DIR}），.rar 归档不支持")
+  add_library(kr2_unrar INTERFACE)
+  set(KR2_HAVE_UNRAR OFF)
+endif()
+
+# ---- 编解码依赖（由 fetch-thirdparty-ios.sh 产出到 build/ios） ----
+get_filename_component(KR2_IOS_LIBDIR "${CMAKE_CURRENT_LIST_DIR}/../../../build/ios/lib" ABSOLUTE)
+get_filename_component(KR2_IOS_INCDIR "${CMAKE_CURRENT_LIST_DIR}/../../../build/ios/include/kr2deps" ABSOLUTE)
+set(KR2_CODEC_LIBS)
+set(KR2_CODEC_INCLUDE_DIRS "${KR2_IOS_INCDIR}" "${KR2_IOS_INCDIR}/jpeg" "${KR2_IOS_INCDIR}/png"
+    "${KR2_IOS_INCDIR}/webp" "${KR2_IOS_INCDIR}/freetype2")
+foreach(lib onig lz4 jpeg png webp)
+  if(EXISTS "${KR2_IOS_LIBDIR}/lib${lib}.a")
+    list(APPEND KR2_CODEC_LIBS "${KR2_IOS_LIBDIR}/lib${lib}.a")
+  endif()
+endforeach()
 
 # ---- 核心库 ----
 add_library(krkr2core STATIC ${KR2_CORE_SOURCES} ${KR2_PLATFORM_SOURCES})
-target_include_directories(krkr2core PRIVATE ${KR2_CORE_INCLUDE_DIRS} ${KR2_COCOS_INCLUDE_DIRS})
-target_compile_definitions(krkr2core PRIVATE ${KR2_COMMON_DEFINITIONS})
-target_compile_options(krkr2core PRIVATE ${KR2_COMMON_OPTIONS})
-# 音频: iOS 系统 OpenAL 框架（与 Linux 版 KR2_OPENAL 对应）
+set_target_properties(krkr2core PROPERTIES CXX_STANDARD 14 CXX_EXTENSIONS ON POSITION_INDEPENDENT_CODE ON)
+target_include_directories(krkr2core PUBLIC
+  ${KR2_CORE_INCLUDE_DIRS} ${KR2_COCOS_INCLUDE_DIRS} ${KR2_CODEC_INCLUDE_DIRS})
+target_compile_definitions(krkr2core PUBLIC
+  TJS_TEXT_OUT_CRLF __STDC_CONSTANT_MACROS USE_UNICODE_FSTRING _7ZIP_ST LINUX KR2_IOS)
+target_compile_options(krkr2core PRIVATE
+  -fno-delete-null-pointer-checks -Wno-deprecated-declarations -Wno-unused-result
+  -Wno-inconsistent-missing-override -Wno-nullability-completeness -Wno-shorten-64-to-32)
 target_link_libraries(krkr2core PUBLIC
-  "-framework OpenAL"
-  "-framework UIKit"
-  "-framework Foundation"
-  "-framework CoreGraphics"
-  "-framework GLKit"
-  "-framework OpenGLES"
-  "-framework Metal"
-  "-framework MetalKit"
-  "-framework MetalFXTAGS_BULLET")
+  cocos2d
+  ZLIB::ZLIB Threads::Threads ${CMAKE_DL_LIBS}
+  "-framework OpenAL" "-framework AudioToolbox" "-framework AVFoundation"
+  "-framework UIKit" "-framework Foundation" "-framework CoreGraphics"
+  "-framework GLKit" "-framework OpenGLES" "-framework Metal" "-framework MetalKit")
+if(KR2_HAVE_7ZIP)
+  target_link_libraries(krkr2core PUBLIC kr2_7zip)
+endif()
+if(KR2_HAVE_UNRAR)
+  target_link_libraries(krkr2core PUBLIC kr2_unrar)
+endif()
+if(KR2_CODEC_LIBS)
+  target_link_libraries(krkr2core PUBLIC ${KR2_CODEC_LIBS})
+endif()
 
-# ---- 插件 ----
+# ---- 内置插件 ----
 add_library(krkr2plugin STATIC ${KR2_PLUGIN_SOURCES})
-target_include_directories(krkr2plugin PRIVATE ${KR2_CORE_INCLUDE_DIRS} ${KR2_COCOS_INCLUDE_DIRS})
-target_compile_definitions(krkr2plugin PRIVATE ${KR2_COMMON_DEFINITIONS})
-target_compile_options(krkr2plugin PRIVATE ${KR2_COMMON_OPTIONS})
-target_link_libraries(krkr2plugin PUBLIC krkr2core)
+set_target_properties(krkr2plugin PROPERTIES CXX_STANDARD 14 CXX_EXTENSIONS ON POSITION_INDEPENDENT_CODE ON)
+target_include_directories(krkr2plugin PRIVATE
+  ${KR2_ROOT}/src/plugins ${KR2_ROOT}/src/plugins/ncbind
+  $<TARGET_PROPERTY:krkr2core,INTERFACE_INCLUDE_DIRECTORIES>)
+target_compile_definitions(krkr2plugin PRIVATE
+  $<TARGET_PROPERTY:krkr2core,INTERFACE_COMPILE_DEFINITIONS>)
+target_compile_options(krkr2plugin PRIVATE
+  -fno-delete-null-pointer-checks -Wno-deprecated-declarations -Wno-unused-result
+  -Wno-inconsistent-missing-override)
+add_dependencies(krkr2plugin krkr2core)
 
-file(GLOB KR2_PLUGIN_EXT_SOURCES CONFIGURE_DEPENDS ${KR2_ROOT}/src/plugins/ext/*.cpp)
+# ---- KrKr2 移植插件（C++17；layerExDraw 需要 blend2d → iOS 排除） ----
+file(GLOB_RECURSE KR2_PLUGIN_EXT_SOURCES CONFIGURE_DEPENDS ${KR2_ROOT}/src/plugins/ext/*.cpp)
+list(FILTER KR2_PLUGIN_EXT_SOURCES EXCLUDE REGEX "/layerExDraw/")
 add_library(krkr2plugin_ext STATIC ${KR2_PLUGIN_EXT_SOURCES})
-target_include_directories(krkr2plugin_ext PRIVATE ${KR2_CORE_INCLUDE_DIRS} ${KR2_COCOS_INCLUDE_DIRS})
-target_compile_definitions(krkr2plugin_ext PRIVATE ${KR2_COMMON_DEFINITIONS})
-target_compile_options(krkr2plugin_ext PRIVATE ${KR2_COMMON_OPTIONS})
-target_link_libraries(krkr2plugin_ext PUBLIC krkr2plugin)
+set_target_properties(krkr2plugin_ext PROPERTIES CXX_STANDARD 17 CXX_EXTENSIONS ON POSITION_INDEPENDENT_CODE ON)
+target_include_directories(krkr2plugin_ext PRIVATE
+  ${KR2_ROOT}/src/plugins ${KR2_ROOT}/src/plugins/ncbind ${KR2_ROOT}/src/plugins/ext
+  $<TARGET_PROPERTY:krkr2core,INTERFACE_INCLUDE_DIRECTORIES>)
+target_compile_definitions(krkr2plugin_ext PRIVATE
+  $<TARGET_PROPERTY:krkr2core,INTERFACE_COMPILE_DEFINITIONS>)
+target_compile_options(krkr2plugin_ext PRIVATE
+  -fno-delete-null-pointer-checks -Wno-deprecated-declarations -Wno-unused-result
+  -Wno-inconsistent-missing-override -Wno-c++11-narrowing)
+add_dependencies(krkr2plugin_ext krkr2core)
 
-message(STATUS "[KR2-IOS] 配置完成: krkr2core(${#KR2_CORE_SOURCES}) plugin(${#KR2_PLUGIN_SOURCES})")
+message(STATUS "[KR2-IOS] core=${#KR2_CORE_SOURCES} plugin=${#KR2_PLUGIN_SOURCES} ext=${#KR2_PLUGIN_EXT_SOURCES} 7zip=${KR2_HAVE_7ZIP} unrar=${KR2_HAVE_UNRAR}")

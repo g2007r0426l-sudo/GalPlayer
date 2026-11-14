@@ -74,11 +74,12 @@ echo "[KRKR] patch cocos2d-x ..."
 python3 "$KX_SRC/scripts/linux/patch-cocos2dx.py" "$TP/cocos2d-x" || echo "[KRKR] WARNING: cocos patch 部分失败（iOS 分支容错）"
 
 # ---------------------------------------------------------------------------
-# 4. 注入 iOS 宿主 + iOS 构建清单
+# 4. 注入 iOS 宿主 + iOS 构建清单 + iOS 依赖库（oniguruma/lz4/cocos 预编译）
 # ---------------------------------------------------------------------------
 mkdir -p "$KX_SRC/platform/ios/compat"
 cp -f "$IOS_HOST/IOSMain.mm" "$IOS_HOST/IOSUtils.cpp" "$IOS_HOST/KR2IOSStubs.cpp" "$KX_SRC/platform/ios/"
-cp -f "$IOS_HOST/CMakeLists.ios" "$KX_SRC/CMakeLists.ios"
+cp -f "$IOS_HOST/CMakeLists.ios" "$KX_SRC/CMakeLists.txt"
+bash "$WORK/fetch-thirdparty-ios.sh" || echo "[KRKR] WARNING: iOS 依赖库部分失败，CMake 阶段会报缺什么"
 
 # ---------------------------------------------------------------------------
 # 5. CMake iOS 构建
