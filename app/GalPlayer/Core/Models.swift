@@ -20,7 +20,18 @@ enum GameEngine: String, Codable, CaseIterable {
         }
     }
 
-    var playable: Bool { self == .kirikiri || self == .onscripter }
+    /// 本机能力开关：当前越狱环境 App 拿不到 GPU，cocos/GL 起不来，
+    /// 因此 Kirikiri2 暂不可玩（界面会标灰并提示原因）。若将来环境放开改回 true 即可。
+    static let kiriKiriSupported = false
+    fileprivate var EngineRegistry_kiriKiriFlag: Bool { GameEngine.kiriKiriSupported }
+
+    var playable: Bool {
+        switch self {
+        case .onscripter: return true
+        case .kirikiri:   return EngineRegistry_kiriKiriFlag
+        default:          return false
+        }
+    }
 }
 
 /// 列表项
