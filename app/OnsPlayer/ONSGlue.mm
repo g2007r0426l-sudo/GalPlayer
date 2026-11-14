@@ -317,6 +317,8 @@ int GP_ONS_Entry(int argc, char **argv) {
 
     // 退出游戏后自动回到 GalPlayer 游戏库
     @autoreleasepool {
+        // 先把自己的窗口藏掉，让 SpringBoard 有目标可回落
+        if (gWindow) { gWindow.hidden = YES; }
         Class wsCls = NSClassFromString(@"LSApplicationWorkspace");
         if (wsCls) {
             id ws = [wsCls performSelector:NSSelectorFromString(@"defaultWorkspace")];
@@ -326,6 +328,8 @@ int GP_ONS_Entry(int argc, char **argv) {
                 fprintf(stderr, "[ONSApp] back to GalPlayer\n");
             }
         }
+        // 给宿主 App 一点时间完成激活，再退出本进程
+        usleep(1200 * 1000);
     }
     return rc;
 }
