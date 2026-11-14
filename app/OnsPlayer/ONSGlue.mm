@@ -282,16 +282,17 @@ int GP_ONS_Entry(int argc, char **argv) {
     // 字体：ONS 需要 TTF；优先用包内 CJK 字体，其次共享目录，最后回落到游戏目录 default.ttf
     std::string fontPath;
     {
-        NSArray *cands = @[
-            [[NSBundle mainBundle] pathForResource:@"DroidSansFallback" ofType:@"ttf"],
-            [[NSBundle mainBundle] pathForResource:@"LXGWWenKai-Regular" ofType:@"ttf"],
-            @"/var/mobile/Documents/Galgames/default.ttf"
-        ];
+        // 注意: @[...] 字面量禁止 nil 元素，必须逐个判空后 addObject
+        NSMutableArray *cands = [NSMutableArray array];
+        NSString *p1 = [[NSBundle mainBundle] pathForResource:@"DroidSansFallback" ofType:@"ttf"];
+        if (p1) [cands addObject:p1];
+        NSString *p2 = [[NSBundle mainBundle] pathForResource:@"LXGWWenKai-Regular" ofType:@"ttf"];
+        if (p2) [cands addObject:p2];
+        [cands addObject:@"/var/mobile/Documents/Galgames/default.ttf"];
+        fprintf(stderr, "[ONSApp] font candidates=%lu\n", (unsigned long)cands.count);
+        NSFileManager *fm = [NSFileManager defaultManager];
         for (NSString *p in cands) {
-            if (p && [[NSFileManager defaultManager] fileExistsAtPath:p]) {
-                fontPath = [p UTF8String];
-                break;
-            }
+            if ([fm fileExistsAtPath:p]) { fontPath = [p UTF8String]; break; }
         }
     }
     std::string a1 = "-f";
