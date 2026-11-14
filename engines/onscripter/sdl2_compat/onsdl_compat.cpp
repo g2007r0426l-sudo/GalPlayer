@@ -19,6 +19,9 @@
 
 extern "C" {
 
+// UIKit 呈现回调（GPU 不可用时由宿主 App 直接把像素贴上 CALayer）
+typedef void (*ONSDPresentFn)(const void *pixels, int w, int h, int pitch);
+
 // ---- 状态 ----
 static SDL_Window   *g_window   = nullptr;
 static SDL_Renderer *g_renderer = nullptr;
