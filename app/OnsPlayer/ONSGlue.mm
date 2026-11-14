@@ -120,6 +120,35 @@ static void present_pixels(const void *px, int w, int h, int pitch) {
     }
 }
 
+
+// ---------------------------------------------------------------------------
+// back to library
+//   ONS 的 end/quit 会直接 exit()，必须自己提供可靠回库入口
+// ---------------------------------------------------------------------------
+static volatile bool gBackDone = false;
+
+static void openLibraryURL(void) {
+    @autoreleasepool {
+        NSURL *url = [NSURL URLWithString:@"galplayer://return"];
+        UIApplication *app = [UIApplication sharedApplication];
+        if (app && url) {
+            [app openURL:url options:@{} completionHandler:nil];
+            fprintf(stderr, "[ONSApp] back to GalPlayer\n");
+        }
+    }
+}
+
+static void requestBackToLibrary(void) {
+    if (gBackDone) return;
+    gBackDone = true;
+    openLibraryURL();
+    // 给系统一点时间切换，再结束本进程
+    usleep(400 * 1000);
+    exit(0);
+}
+
+static void atexitBack(void) { openLibraryURL(); }
+
 // ---------------------------------------------------------------------------
 // frame view with touch handling
 // ---------------------------------------------------------------------------
@@ -136,8 +165,24 @@ static void present_pixels(const void *px, int w, int h, int pitch) {
         self.layer.contentsGravity = kCAGravityResizeAspect;
         self.layer.magnificationFilter = kCAFilterLinear;
         self.layer.minificationFilter = kCAFilterLinear;
+
+        // 左上角返回按钮（44pt 命中区，半透明，不抢游戏画面）
+        UIButton *back = [UIButton buttonWithType:UIButtonTypeSystem];
+        back.frame = CGRectMake(18, 18, 44, 44);
+        back.backgroundColor = [UIColor colorWithWhite:0 alpha:0.35];
+        back.layer.cornerRadius = 22;
+        back.tintColor = [UIColor whiteColor];
+        UIImage *img = [UIImage systemImageNamed:@"chevron.left"];
+        [back setImage:img forState:UIControlStateNormal];
+        back.autoresizingMask = UIViewAutoresizingFlexibleRightMargin | UIViewAutoresizingFlexibleBottomMargin;
+        [back addTarget:self action:@selector(tapBack) forControlEvents:UIControlEventTouchUpInside];
+        [self addSubview:back];
     }
     return self;
+}
+
+- (void)tapBack {
+    requestBackToLibrary();
 }
 
 - (void)touchesBegan:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
@@ -284,6 +329,7 @@ int GP_ONS_Entry(int argc, char **argv) {
     gFillScreen = (stretch != 0);
     onsdl_set_scale_mode(stretch);
 
+    atexit(atexitBack);   // 引擎 exit() 时也能回库
     std::string a0 = "onscripter";
     std::string fontPath;
     {
