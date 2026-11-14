@@ -47,6 +47,10 @@ static UIView *gFrameView = nil;
 static UIWindow *gWindow = nil;
 static volatile bool gSkipMode = false;
 static bool gFillScreen = false;   // true = 拉伸铺满，false = 等比黑边
+static int  gSkipMs = 160;         // 快进连点间隔（由设置页「快进速度」换算）
+static int  gVolume = 75;          // 0-100
+
+extern "C" int Mix_Volume(int channel, int volume);
 static bool   gSingleDown = false;
 static CGPoint gLastPoint = CGPointMake(0, 0);
 
@@ -299,6 +303,16 @@ int GP_ONS_Entry(int argc, char **argv) {
         }
         // 第 2 行 = 是否拉伸全屏
         if (fgets(line, sizeof(line), fp)) stretch = (line[0] == '1') ? 1 : 0;
+        // 第 3 行 = 快进间隔毫秒
+        if (fgets(line, sizeof(line), fp)) {
+            int v = atoi(line);
+            if (v >= 40 && v <= 2000) gSkipMs = v;
+        }
+        // 第 4 行 = 音量
+        if (fgets(line, sizeof(line), fp)) {
+            int v = atoi(line);
+            if (v >= 0 && v <= 100) gVolume = v;
+        }
         fclose(fp);
         unlink(K_MARKER);
     }
@@ -330,6 +344,18 @@ int GP_ONS_Entry(int argc, char **argv) {
     onsdl_set_scale_mode(stretch);
 
     atexit(atexitBack);   // 引擎 exit() 时也能回库
+
+    // 引擎初始化完 mixer 后应用音量设置
+    {
+        int vol = gVolume;
+        static int sVol = 0;
+        sVol = vol;
+        dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
+            usleep(1800 * 1000);
+            Mix_Volume(-1, sVol * 128 / 100);
+            fprintf(stderr, "[ONSApp] volume applied: %d\n", sVol);
+        });
+    }
     std::string a0 = "onscripter";
     std::string fontPath;
     {

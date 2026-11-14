@@ -69,9 +69,17 @@ final class GameSession {
         do {
             let target = try launchTarget(for: entry, engine: engine)
             let markerPath = gamesRoot + "/" + markerName
-            // 标记文件: 第 1 行 = 启动目标；第 2 行 = 拉伸全屏(1)/等比(0)
-            let stretch = AppSettings.shared.stretchFullscreen ? "1" : "0"
-            let payload = target + "\n" + stretch + "\n"
+            // 标记文件:
+            //   1 行 启动目标
+            //   2 行 拉伸全屏 1/0
+            //   3 行 快进间隔毫秒（由「快进文字速度」换算）
+            //   4 行 音量 0-100
+            let settings = AppSettings.shared
+            let stretch = settings.stretchFullscreen ? "1" : "0"
+            let speed = max(0.25, min(4.0, settings.textSpeed))
+            let skipMs = Int(160.0 / speed)
+            let volume = Int(max(0, min(1, settings.volume)) * 100)
+            let payload = target + "\n" + stretch + "\n" + String(skipMs) + "\n" + String(volume) + "\n"
             try payload.write(to: URL(fileURLWithPath: markerPath), atomically: true, encoding: .utf8)
             openBundle(bundleID)
             AppSettings.shared.markPlayed(entry.name)
