@@ -71,3 +71,6 @@ targets:
       - sdk: CoreMedia.framework
       - sdk: CoreMotion.framework
       - sdk: MediaPlayer.framework
+      - sdk: CoreFoundation.framework
+      - sdk: MobileCoreServices.framework
+      - sdk: ImageIO.framework

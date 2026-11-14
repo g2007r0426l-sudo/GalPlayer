@@ -107,6 +107,8 @@ cmake --install "$BUILD_DIR" --prefix "$BUILD_ROOT/prefix" >/dev/null 2>&1 || tr
 
 build_sdl_ext() {
     local name="$1"; local repo="$2"; local tags="$3"; local recurse="$4"
+    shift 4
+    local extra_flags=("$@")
     local ext_dir="$ROOT_DIR/SDL2/SDL_$name"
     if [ ! -f "$BUILD_ROOT/lib/libSDL2_$name.a" ]; then
         if [ ! -d "$ext_dir/.git" ]; then
@@ -135,7 +137,8 @@ build_sdl_ext() {
             -DCMAKE_PREFIX_PATH="$BUILD_ROOT/prefix" \
             -DSDL2_LIBRARY="$BUILD_ROOT/lib/libSDL2.a" \
             -DSDL2_INCLUDE_DIR="$BUILD_ROOT/include/SDL2" \
-            -DCMAKE_INSTALL_PREFIX="$BUILD_ROOT/prefix"
+            -DCMAKE_INSTALL_PREFIX="$BUILD_ROOT/prefix" \
+            "${extra_flags[@]}"
         cmake --build "$ext_build" -j "$(sysctl -n hw.ncpu)"
         local lib=$(find "$ext_build" -name "libSDL2_$name.a" | head -n 1)
         if [ -n "$lib" ]; then
@@ -149,8 +152,9 @@ build_sdl_ext() {
     fi
 }
 
-# SDL_image: 内置 stb 解码器（PNG/JPG），无需外部库
-build_sdl_ext "image" "libsdl-org/SDL_image" "release-2.6.3|release-2.8.4|release-2.8.0" "no"
+# SDL_image: 内置 stb 解码器（PNG/JPG），关闭 ImageIO 后端避免 CoreServices 依赖
+build_sdl_ext "image" "libsdl-org/SDL_image" "release-2.6.3|release-2.8.4|release-2.8.0" "no" \
+    -DSDL2IMAGE_IMAGEIO=OFF
 # SDL_ttf: 需要 freetype 子模块（recurse）
 build_sdl_ext "ttf"   "libsdl-org/SDL_ttf"   "release-2.22.1|release-2.20.2|release-2.0.18" "yes"
 # SDL_mixer: 内置解码器（WAV/OGG/FLAC/MP3/MIDI 均为 in-tree）
