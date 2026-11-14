@@ -82,17 +82,17 @@ if [ -z "$LIB" ]; then
 fi
 cp -f "$LIB" "$BUILD_ROOT/lib/libSDL2.a"
 
-# 头文件
+# 头文件: 必须用构建目录里 CMake 生成的 SDL_config.h（源码模板版会导致 Sint64 断言失败）
 rm -rf "$BUILD_ROOT/include/SDL2"
 mkdir -p "$BUILD_ROOT/include/SDL2"
-if [ -d "$SDL_SRC/include" ]; then
-    cp "$SDL_SRC"/include/*.h "$BUILD_ROOT/include/SDL2/"
-    # 复制配置头（SDL_config.h 可能由 CMake 生成）
-    if [ ! -f "$BUILD_ROOT/include/SDL2/SDL_config.h" ]; then
-        find "$BUILD_DIR" -name "SDL_config.h" -exec cp -f {} "$BUILD_ROOT/include/SDL2/" \; || true
-        cp -f "$SDL_SRC/include/SDL_config.h.default" "$BUILD_ROOT/include/SDL2/SDL_config.h" 2>/dev/null || true
-    fi
+if [ -d "$BUILD_DIR/include/SDL2" ]; then
+    cp "$BUILD_DIR"/include/SDL2/*.h "$BUILD_ROOT/include/SDL2/" 2>/dev/null || true
 fi
+if [ ! -f "$BUILD_ROOT/include/SDL2/SDL_config.h" ]; then
+    cp "$SDL_SRC"/include/*.h "$BUILD_ROOT/include/SDL2/" 2>/dev/null || true
+fi
+find "$BUILD_DIR" -name "SDL_config.h" -exec cp -f {} "$BUILD_ROOT/include/SDL2/" \; 2>/dev/null || true
+echo "[SDL2] SDL_config.h 来源: $(grep -m1 'SDL_CONFIG_H_FROM\|Generated' "$BUILD_ROOT/include/SDL2/SDL_config.h" 2>/dev/null | head -c 80 || ls -la "$BUILD_ROOT/include/SDL2/SDL_config.h")"
 
 echo "[SDL2] OK -> $BUILD_ROOT/lib/libSDL2.a"
 
@@ -102,9 +102,10 @@ echo "[SDL2] OK -> $BUILD_ROOT/lib/libSDL2.a"
 # 手动铺设 prefix 布局（SDL_image/ttf/mixer 的 PrivateSDL2 查找需要 lib+include 齐备）
 mkdir -p "$BUILD_ROOT/prefix/lib" "$BUILD_ROOT/prefix/include/SDL2"
 cp -f "$BUILD_ROOT/lib/libSDL2.a" "$BUILD_ROOT/prefix/lib/" 2>/dev/null || true
-cp "$SDL_SRC"/include/*.h "$BUILD_ROOT/prefix/include/SDL2/" 2>/dev/null || true
+cp "$BUILD_ROOT"/include/SDL2/*.h "$BUILD_ROOT/prefix/include/SDL2/" 2>/dev/null || true
 find "$BUILD_DIR" -name "SDL_config.h" -exec cp -f {} "$BUILD_ROOT/prefix/include/SDL2/" \; 2>/dev/null || true
 cmake --install "$BUILD_DIR" --prefix "$BUILD_ROOT/prefix" >/dev/null 2>&1 || true
+find "$BUILD_DIR" -name "SDL_config.h" -exec cp -f {} "$BUILD_ROOT/prefix/include/SDL2/" \; 2>/dev/null || true
 
 build_sdl_ext() {
     local name="$1"; local repo="$2"; local tags="$3"; local recurse="$4"
