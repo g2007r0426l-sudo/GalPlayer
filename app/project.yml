@@ -36,7 +36,6 @@ settings:
       - "-lc++"
       - "-lSDL2"
       - "-lons"
-      - "-lkrkr2"
       - "-lfreetype"
       - "-ljpeg"
       - "-lvorbisfile"
