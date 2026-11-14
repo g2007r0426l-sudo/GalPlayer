@@ -16,7 +16,7 @@ on:
 
 jobs:
   build:
-    runs-on: macos-14     # 苹果 Silicon 云端 Mac
+    runs-on: macos-latest     # 苹果 Silicon 云端 Mac
     timeout-minutes: 300
     steps:
       - name: 拉取代码
