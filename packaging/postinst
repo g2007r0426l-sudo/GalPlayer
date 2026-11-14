@@ -1,14 +1,23 @@
 #!/bin/sh
-# 安装后: 修正权限 + ldid 递归签名兜底 + uicache 注册图标
+# 安装后: 修正权限 + ldid 递归签名兜底 + uicache 注册图标（双 App）
 if [ -d /var/jb ]; then
-  APP_PATH="/var/jb/Applications/GalPlayer.app"
+  APP_BASE="/var/jb/Applications"
 else
-  APP_PATH="/Applications/GalPlayer.app"
+  APP_BASE="/Applications"
 fi
-chown -R root:wheel "$APP_PATH"
-chmod -R 755 "$APP_PATH"
-# 递归签名兜底（若构建时已签，重复签无害）
-for f in $(find "$APP_PATH" -type f); do ldid -S "$f" 2>/dev/null; done
-ldid -S "$APP_PATH/GalPlayer"
-uicache -p "$APP_PATH"
+
+sign_app() {
+  APP_PATH="$1"
+  [ -d "$APP_PATH" ] || return 0
+  chown -R root:wheel "$APP_PATH"
+  chmod -R 755 "$APP_PATH"
+  # 递归签名兜底（若构建时已签，重复签无害）
+  for f in $(find "$APP_PATH" -type f); do ldid -S "$f" 2>/dev/null; done
+  ldid -S "$APP_PATH/$(basename "$APP_PATH" .app)" 2>/dev/null
+  uicache -p "$APP_PATH"
+}
+
+sign_app "$APP_BASE/GalPlayer.app"
+sign_app "$APP_BASE/Kirikinux2.app"
+
 exit 0

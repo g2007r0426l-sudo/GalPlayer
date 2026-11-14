@@ -1,4 +1,6 @@
 #!/bin/sh
-# 卸载后: 移除图标缓存
+# 卸载后: 移除图标缓存（双 App）
 uicache -u com.yg.galplayer 2>/dev/null
+uicache -u com.yg.kirikinux2 2>/dev/null
+rm -rf /var/mobile/Documents/Galgames/.krkr_launch 2>/dev/null
 exit 0

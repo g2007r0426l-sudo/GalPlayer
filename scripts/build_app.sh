@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # =============================================================================
 # 编译 App（xcodegen 生成工程 -> xcodebuild 出 .app）
-# 前置: brew install xcodegen；engines 构建产物已在 build/ios/lib/
+#   必须: build/ios/lib/ 下 GalPlayer 侧库齐备
+#   可选: Kirikinux2 侧库齐备时一并构建（缺库则跳过，.deb 里就只有主 App）
 # =============================================================================
 set -euo pipefail
 
@@ -9,15 +10,10 @@ ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 APP_DIR="$ROOT_DIR/app"
 BUILD_ROOT="$ROOT_DIR/build/ios"
 
-# 引擎库检查（缺失给出明确指引）
-for lib in libSDL2.a libons.a libkrkr2.a libfreetype.a libSDL2_image.a libSDL2_ttf.a libSDL2_mixer.a libSDL2stdlib.a; do
+for lib in libSDL2.a libons.a libfreetype.a libSDL2_image.a libSDL2_ttf.a libSDL2_mixer.a libSDL2stdlib.a; do
     if [ ! -f "$BUILD_ROOT/lib/$lib" ]; then
         echo "[app] ERROR: 缺少 $BUILD_ROOT/lib/$lib"
-        echo "  先依次运行:"
-        echo "    engines/fonts/fetch_fonts.sh"
-        echo "    engines/SDL2/build_ios.sh"
-        echo "    engines/onscripter/build_ios.sh"
-        echo "    engines/kirikiroid2/build_ios.sh"
+        echo "  先运行 engines/SDL2/build_ios.sh 与 engines/onscripter/build_ios.sh"
         exit 1
     fi
 done
@@ -28,21 +24,32 @@ command -v xcodebuild >/dev/null || { echo "[app] ERROR: 需要 macOS + Xcode"; 
 cd "$APP_DIR"
 xcodegen generate
 
-echo "[app] xcodebuild (iphoneos arm64) ..."
-xcodebuild \
-    -project GalPlayer.xcodeproj \
-    -scheme GalPlayer \
-    -configuration Release \
-    -sdk iphoneos \
-    -destination "generic/platform=iOS" \
-    ARCHS=arm64 ONLY_ACTIVE_ARCH=NO \
-    CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
-    CONFIGURATION_BUILD_DIR="$ROOT_DIR/build/app" \
-    build
+COMMON_ARGS=(
+    -project GalPlayer.xcodeproj
+    -configuration Release
+    -sdk iphoneos
+    -destination "generic/platform=iOS"
+    ARCHS=arm64 ONLY_ACTIVE_ARCH=NO
+    CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY=""
+    CONFIGURATION_BUILD_DIR="$ROOT_DIR/build/app"
+)
 
-OUT="$ROOT_DIR/build/app/GalPlayer.app"
-[ -d "$OUT" ] || OUT=$(find "$ROOT_DIR/build/app" -maxdepth 1 -name "*.app" | head -1)
-[ -d "$OUT" ] || { echo "[app] ERROR: 构建产物未找到"; exit 1; }
+echo "[app] xcodebuild GalPlayer ..."
+xcodebuild "${COMMON_ARGS[@]}" -target GalPlayer build
 
-echo "[app] OK -> $OUT"
-echo "  下一步: packaging/build_deb.sh"
+# ---- KRKR 引擎 App（可选，缺库则跳过） ----
+KRKR_OK=1
+for lib in libkrkr2core.a libcocos2d.a; do
+    [ -f "$BUILD_ROOT/lib/$lib" ] || KRKR_OK=0
+done
+if [ "$KRKR_OK" = "1" ]; then
+    echo "[app] xcodebuild Kirikinux2 ..."
+    if ! xcodebuild "${COMMON_ARGS[@]}" -target Kirikinux2 build; then
+        echo "[app] WARNING: Kirikinux2 构建失败，仅打包主 App"
+    fi
+else
+    echo "[app] 跳过 Kirikinux2（KRKR 库未就绪: $BUILD_ROOT/lib/libkrkr2core.a）"
+fi
+
+ls -la "$ROOT_DIR/build/app" | head -20
+echo "[app] OK。下一步: packaging/build_deb.sh"
