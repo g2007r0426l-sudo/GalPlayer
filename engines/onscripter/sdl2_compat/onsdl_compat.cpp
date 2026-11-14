@@ -72,32 +72,33 @@ SDL_Surface *SDL_Compat_SetVideoMode(int w, int h, int bpp, Uint32 flags) {
     }
 
     if (!g_renderer) {
-        // iOS 上可用驱动有限（metal / opengles2 / opengles），逐个显式尝试并打印诊断
+        // iOS 上可用驱动有限（metal / opengles2 / opengles），按名字查到索引后逐个尝试
         int ndrv = SDL_GetNumRenderDrivers();
         fprintf(stderr, "[onsdl] 可用渲染驱动数=%d\n", ndrv);
+        int idx_metal = -1, idx_es2 = -1, idx_es1 = -1;
         for (int i = 0; i < ndrv; ++i) {
             SDL_RendererInfo info;
-            if (SDL_GetRenderDriverInfo(i, &info) == 0)
+            if (SDL_GetRenderDriverInfo(i, &info) == 0) {
                 fprintf(stderr, "[onsdl]   driver[%d]=%s\n", i, info.name);
+                if (!strcmp(info.name, "metal"))     idx_metal = i;
+                if (!strcmp(info.name, "opengles2")) idx_es2 = i;
+                if (!strcmp(info.name, "opengles"))  idx_es1 = i;
+            }
         }
-        const char *order[] = {"metal", "opengles2", "opengles", nullptr};
-        for (int i = 0; order[i]; ++i) {
-            g_renderer = SDL_CreateRenderer(g_window, order[i],
+        int tries[4] = { idx_metal, idx_es2, idx_es1, -1 };
+        for (int t = 0; t < 4 && !g_renderer; ++t) {
+            if (t < 3 && tries[t] < 0) continue;
+            g_renderer = SDL_CreateRenderer(g_window, tries[t],
                                             SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
+            if (!g_renderer)
+                g_renderer = SDL_CreateRenderer(g_window, tries[t], SDL_RENDERER_ACCELERATED);
+            if (!g_renderer)
+                g_renderer = SDL_CreateRenderer(g_window, tries[t], 0);
             if (g_renderer) {
-                fprintf(stderr, "[onsdl] renderer=%s 创建成功\n", order[i]);
+                fprintf(stderr, "[onsdl] renderer 创建成功 (index=%d)\n", tries[t]);
                 break;
             }
-            fprintf(stderr, "[onsdl] renderer %s 失败: %s\n", order[i], SDL_GetError());
-            g_renderer = SDL_CreateRenderer(g_window, order[i], SDL_RENDERER_ACCELERATED);
-            if (g_renderer) {
-                fprintf(stderr, "[onsdl] renderer=%s 创建成功(无vsync)\n", order[i]);
-                break;
-            }
-        }
-        if (!g_renderer) {
-            g_renderer = SDL_CreateRenderer(g_window, -1, SDL_RENDERER_SOFTWARE);
-            if (g_renderer) fprintf(stderr, "[onsdl] renderer=software\n");
+            fprintf(stderr, "[onsdl] index=%d 尝试失败: %s\n", tries[t], SDL_GetError());
         }
         if (!g_renderer) {
             fprintf(stderr, "[onsdl] CreateRenderer failed: %s\n", SDL_GetError());
