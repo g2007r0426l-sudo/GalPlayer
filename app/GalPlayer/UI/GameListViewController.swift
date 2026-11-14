@@ -285,10 +285,18 @@ final class GameListViewController: UIViewController {
 
     private func applyFilter() {
         var list = entries
+        // 真实游玩时间优先，其次才是目录时间；未玩过的按名字
+        let played = AppSettings.shared.lastPlayed
+        let stamp: (GameEntry) -> Date = { played[$0.name] ?? $0.dirMtime }
         if mode == .recent {
-            list.sort { $0.dirMtime > $1.dirMtime }
+            list.sort { stamp($0) > stamp($1) }
         } else {
-            list.sort { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+            list.sort { a, b in
+                let pa = played[a.name], pb = played[b.name]
+                if (pa != nil) != (pb != nil) { return pa != nil }   // 玩过的排前
+                if let x = pa, let y = pb, x != y { return x > y }
+                return a.name.localizedStandardCompare(b.name) == .orderedAscending
+            }
         }
         if !searchText.isEmpty {
             list = list.filter { $0.name.localizedCaseInsensitiveContains(searchText) }

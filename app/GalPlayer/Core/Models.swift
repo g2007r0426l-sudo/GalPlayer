@@ -65,6 +65,28 @@ final class AppSettings {
         set { d.set(newValue, forKey: "gp.textSpeed") }
     }
 
+    /// 最近游玩时间（按游戏名记录，供「最近游玩」排序与大卡选择）
+    var lastPlayed: [String: Date] {
+        get {
+            guard let data = d.data(forKey: "gp.lastPlayed"),
+                  let map = try? JSONDecoder().decode([String: Date].self, from: data) else { return [:] }
+            return map
+        }
+        set {
+            if let data = try? JSONEncoder().encode(newValue) {
+                d.set(data, forKey: "gp.lastPlayed")
+            }
+        }
+    }
+
+    func markPlayed(_ name: String) {
+        var map = lastPlayed
+        map[name] = Date()
+        lastPlayed = map
+    }
+
+    func playedAt(_ name: String) -> Date? { lastPlayed[name] }
+
     /// 0.0 ~ 1.0（系统媒体音量）
     var volume: Float {
         get { d.object(forKey: "gp.volume") as? Float ?? 0.75 }

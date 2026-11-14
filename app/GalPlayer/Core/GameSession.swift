@@ -74,6 +74,7 @@ final class GameSession {
             let payload = target + "\n" + stretch + "\n"
             try payload.write(to: URL(fileURLWithPath: markerPath), atomically: true, encoding: .utf8)
             openBundle(bundleID)
+            AppSettings.shared.markPlayed(entry.name)
             current = entry
             completion(.success(()))
         } catch {
