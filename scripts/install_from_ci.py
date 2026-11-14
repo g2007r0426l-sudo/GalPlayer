@@ -18,6 +18,20 @@ def api(url, headers=None):
     req = urllib.request.Request(url, headers=headers or {})
     return urllib.request.urlopen(req, timeout=120)
 
+def download_artifact(url, headers):
+    """GitHub 产物下载会 302 到 Azure 存储；重定向后必须去掉 Authorization 头"""
+    class NoRedirect(urllib.request.HTTPRedirectHandler):
+        def redirect_request(self, req, fp, code, msg, hdrs, newurl):
+            return None
+    opener = urllib.request.build_opener(NoRedirect)
+    try:
+        return opener.open(urllib.request.Request(url, headers=headers), timeout=120).read()
+    except urllib.error.HTTPError as e:
+        if e.code in (301, 302, 303, 307, 308):
+            loc = e.headers.get("Location")
+            return urllib.request.urlopen(loc, timeout=600).read()
+        raise
+
 # 1) 找到目标运行
 token = open(TOKEN_FILE).read().strip()
 H = {"Authorization": f"Bearer {token}", "User-Agent": "GalPlayerBuilder"}
@@ -37,8 +51,7 @@ art = next((a for a in arts if a["name"] == "galplayer-deb"), None)
 if not art:
     print("产物 galplayer-deb 不存在"); sys.exit(1)
 print(f"[CI] 下载产物 {art['size_in_bytes']:,} bytes ...")
-zip_req = api(f"https://api.github.com/repos/{REPO}/actions/artifacts/{art['id']}/zip", H)
-zip_data = zip_req.read()
+zip_data = download_artifact(f"https://api.github.com/repos/{REPO}/actions/artifacts/{art['id']}/zip", H)
 zf = zipfile.ZipFile(io.BytesIO(zip_data))
 deb_names = [n for n in zf.namelist() if n.endswith(".deb")]
 if not deb_names:
