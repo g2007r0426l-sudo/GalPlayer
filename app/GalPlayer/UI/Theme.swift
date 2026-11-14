@@ -8,7 +8,7 @@ enum Theme {
     // 文字
     static let text     = UIColor(red: 0x1C/255.0, green: 0x1C/255.0, blue: 0x1E/255.0, alpha: 1) // #1C1C1E
     static let textSub  = UIColor(red: 0x8E/255.0, green: 0x8E/255.0, blue: 0x93/255.0, alpha: 1) // #8E8E93
-    static let textOnDark = .white
+    static let textOnDark: UIColor = .white
 
     // 强调（樱粉）
     static let accent     = UIColor(red: 0xFF/255.0, green: 0x7E/255.0, blue: 0xB6/255.0, alpha: 1) // #FF7EB6

@@ -73,6 +73,21 @@ fi
 echo "[KRKR] patch cocos2d-x ..."
 python3 "$KX_SRC/scripts/linux/patch-cocos2dx.py" "$TP/cocos2d-x" || echo "[KRKR] WARNING: cocos patch 部分失败（iOS 分支容错）"
 
+# cocos 3.17.2 用 CMAKE_SYSTEM_NAME 判平台; iOS 交叉构建时值为 "iOS" 而非 "Darwin"
+python3 - "$TP/cocos2d-x/cmake/Modules/CocosConfigDefine.cmake" <<'PYEOF'
+import sys, pathlib
+p = pathlib.Path(sys.argv[1])
+if not p.exists():
+    print("[KRKR] WARN: CocosConfigDefine.cmake 不存在"); sys.exit(0)
+s = p.read_text(encoding="utf-8", errors="surrogateescape")
+if 'MATCHES "Darwin"' in s:
+    s = s.replace('MATCHES "Darwin"', 'MATCHES "Darwin|iOS"')
+    p.write_text(s, encoding="utf-8", errors="surrogateescape")
+    print("[KRKR] CocosConfigDefine: 增加 iOS 平台识别")
+else:
+    print("[KRKR] CocosConfigDefine: 已是 iOS 兼容版")
+PYEOF
+
 # ---------------------------------------------------------------------------
 # 4. 注入 iOS 宿主 + iOS 构建清单 + iOS 依赖库（oniguruma/lz4/cocos 预编译）
 # ---------------------------------------------------------------------------
@@ -103,7 +118,8 @@ if [ "${KR2_SKIP_BUILD:-0}" != "1" ]; then
         -DKR2_COCOS2DX_ROOT="$TP/cocos2d-x" \
         -DKR2_THIRD_PARTY="$TP" \
         -DKR2_WITH_BLEND2D=0 \
-        -DKR2_WITH_JXR=0
+        -DKR2_WITH_JXR=0 \
+        -DIOS=ON
     cmake --build "$KRKR_BUILD" -j "$(sysctl -n hw.ncpu)"
 
     for lib in libkrkr2core.a libkrkr2plugin.a libkrkr2plugin_ext.a libcocos2d.a; do

@@ -212,7 +212,7 @@ final class GameListViewController: UIViewController {
                 section.contentInsets = NSDirectionalEdgeInsets(top: 8, leading: 20, bottom: 8, trailing: 20)
                 return section
             } else {
-                let width = env.container.effectiveContainerWidth
+                let width = env.container.contentSize.width
                 let cols = self.columnCount(for: width)
                 let inset: CGFloat = 20, spacing: CGFloat = 16
                 let itemW = (width - inset * 2 - spacing * CGFloat(cols - 1)) / CGFloat(cols)
@@ -370,9 +370,9 @@ final class GameListViewController: UIViewController {
                 switch result {
                 case .success:
                     break // SDL 窗口将全屏接管
-                case .failure(let msg):
+                case .failure(let err):
                     self?.presentedViewController?.dismiss(animated: false)
-                    let alert = UIAlertController(title: "启动失败", message: msg, preferredStyle: .alert)
+                    let alert = UIAlertController(title: "启动失败", message: err.message, preferredStyle: .alert)
                     alert.addAction(UIAlertAction(title: "好的", style: .default))
                     self?.present(alert, animated: true)
                 }

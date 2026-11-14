@@ -8,6 +8,13 @@ import UIKit
 //   退出游戏: 引擎收到 SDL_QUIT 自然退出 -> 回调 -> 回到列表
 // =============================================================================
 
+/// 会话错误（Result 的 Failure 类型）
+struct SessionError: LocalizedError {
+    let message: String
+    init(_ message: String) { self.message = message }
+    var errorDescription: String? { message }
+}
+
 final class GameSession {
     static let shared = GameSession()
 
@@ -26,13 +33,13 @@ final class GameSession {
 
     var isRunning: Bool { GP_EngineIsRunning() != 0 }
 
-    func start(entry: GameEntry, completion: @escaping (Result<Void, String>) -> Void) {
+    func start(entry: GameEntry, completion: @escaping (Result<Void, SessionError>) -> Void) {
         let engine = EngineRegistry.shared.effectiveEngine(for: entry)
         guard engine.playable else {
             if engine == .artemis {
-                completion(.failure("Artemis 引擎（root.pfs）一期暂不支持，建议用 Artroid+ 打开"))
+                completion(.failure(SessionError("Artemis 引擎（root.pfs）一期暂不支持，建议用 Artroid+ 打开")))
             } else {
-                completion(.failure("无法识别引擎，请在长按菜单中手动指定"))
+                completion(.failure(SessionError("无法识别引擎，请在长按菜单中手动指定")))
             }
             return
         }
@@ -46,30 +53,25 @@ final class GameSession {
                 openBundle("com.yg.kirikinux2")
                 completion(.success(()))
             } catch {
-                completion(.failure("启动标记写入失败: \(error.localizedDescription)"))
+                completion(.failure(SessionError("启动标记写入失败: \(error.localizedDescription)")))
             }
             return
         }
 
         // ONScripter: 进程内 SDL2 会话
         guard !isRunning else {
-            completion(.failure("已有游戏在运行，请先退出"))
+            completion(.failure(SessionError("已有游戏在运行，请先退出")))
             return
         }
 
         let settings = AppSettings.shared
         let fontPath = Bundle.main.path(forResource: "DroidSansFallback", ofType: "ttf")
 
-        var dataFile: String? = nil
-        if engine == .kirikiri {
-            dataFile = Scanner.shared.findFirstXp3(inDir: entry.path)
-        }
-
-        let kind = (engine == .kirikiri) ? GP_ENGINE_KIRIKIRI : GP_ENGINE_ONSCRIPTER
+        let kind: Int32 = 1   // GP_ENGINE_ONSCRIPTER
         let rc = GP_EngineStart(kind,
                                 entry.path,
                                 fontPath,
-                                dataFile,
+                                nil,
                                 settings.stretchFullscreen ? 1 : 0,
                                 settings.textSpeed)
 
@@ -77,7 +79,7 @@ final class GameSession {
             current = entry
             completion(.success(()))
         } else {
-            completion(.failure(rc == -1 ? "引擎已在运行" : "启动失败（错误码 \(rc)），详见 TROUBLESHOOTING.md"))
+            completion(.failure(SessionError(rc == -1 ? "引擎已在运行" : "启动失败（错误码 \(rc)），详见 TROUBLESHOOTING.md")))
         }
     }
 
