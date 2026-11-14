@@ -242,7 +242,6 @@ xcrun -sdk iphoneos ar rcs "$OUT" "${OBJS[@]}" "$BUILD_ROOT/lib/libjpeg.a" 2>/de
 xcrun -sdk iphoneos ranlib "$OUT"
 
 echo "[ONS] OK -> $OUT"
-{
-    COMMIT=$(git -C "$ONS_DIR" rev-parse HEAD 2>/dev/null || echo "tarball(no-git)")
-    echo "- **ONScripter(-JH)**: source=$ONS_DIR commit=$COMMIT（SDL1.2源码 + sdl2_compat 兼容层编译）-> build/ios/lib/libons.a"
-} >> "$ROOT_DIR/THIRD_PARTY_RESOLVED.md"
+ONS_COMMIT=$(git -C "$ONS_DIR" rev-parse HEAD 2>/dev/null || echo "tarball(no-git)")
+echo "- **ONScripter(-JH)**: source=$ONS_DIR commit=${ONS_COMMIT} (SDL1.2 source + sdl2_compat shim) -> build/ios/lib/libons.a" \
+    >> "$ROOT_DIR/THIRD_PARTY_RESOLVED.md"
