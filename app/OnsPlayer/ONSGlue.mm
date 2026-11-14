@@ -39,7 +39,7 @@ static bool   g_pendingRight = false;
 static Uint32 g_twoT0 = 0;
 static Uint32 g_lastClick = 0;
 static bool   g_monitorRun = false;
-static std::thread g_monitor;
+static std::thread *g_monitor = nullptr;   // 堆分配：避免 exit() 时析构 joinable thread → std::terminate
 
 static SDL_Window *engineWindow() { return SDL_GetWindowFromID(1); }
 
@@ -198,16 +198,18 @@ int GP_ONS_Entry(int argc, char **argv) {
     // 3. 触控映射 + 监控线程
     SDL_AddEventWatch(touchWatch, nullptr);
     g_monitorRun = true;
-    g_monitor = std::thread(monitorLoop);
+    g_monitor = new std::thread(monitorLoop);
+    g_monitor->detach();
 
-    // 4. 引擎主循环（脚本名交由引擎在 cwd 自动探测 nscript.dat / 0.txt）
-    std::string a0 = "onscripter", a1 = gameDir;
-    char *av[] = { const_cast<char *>(a0.c_str()), const_cast<char *>(a1.c_str()), nullptr };
-    int rc = ons_main(2, av);
+    // 4. 引擎主循环
+    //    注意: ONScripter 的参数解析只接受以 '-' 开头的选项，传裸目录会被判非法
+    //    并调用 optionHelp() -> exit()。我们已 chdir 到游戏目录，因此不传任何参数。
+    std::string a0 = "onscripter";
+    char *av[] = { const_cast<char *>(a0.c_str()), nullptr };
+    int rc = ons_main(1, av);
     fprintf(stderr, "[ONSApp] ons_main 退出 rc=%d\n", rc);
 
     g_monitorRun = false;
-    if (g_monitor.joinable()) g_monitor.join();
     SDL_DelEventWatch(touchWatch, nullptr);
     return rc;
 }

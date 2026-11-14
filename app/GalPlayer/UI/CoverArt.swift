@@ -15,18 +15,31 @@ enum CoverArt {
         return abs(h)
     }
 
+    /// 启动时把封面临时加载进内存（按 Bundle 路径直取，最稳）
+    private static let cache: [UIImage] = {
+        var imgs: [UIImage] = []
+        for i in 1...count {
+            if let p = Bundle.main.path(forResource: "cover\(i)", ofType: "jpg"),
+               let img = UIImage(contentsOfFile: p) {
+                imgs.append(img)
+            } else if let p2 = Bundle.main.path(forResource: "cover\(i)", ofType: "jpg", inDirectory: "covers"),
+                      let img2 = UIImage(contentsOfFile: p2) {
+                imgs.append(img2)
+            }
+        }
+        NSLog("[GalPlayer] 封面池加载: \(imgs.count)/\(count) 张")
+        return imgs
+    }()
+
+    static var isAvailable: Bool { !cache.isEmpty }
+
     static func index(for name: String) -> Int {
-        stableHash(name) % count + 1
+        stableHash(name) % max(cache.count, 1)
     }
 
     static func image(for name: String) -> UIImage? {
-        let idx = index(for: name)
-        if let img = UIImage(named: "cover\(idx)") { return img }
-        // 兜底：按序号尝试
-        for i in 1...count {
-            if let img = UIImage(named: "cover\(i)") { return img }
-        }
-        return nil
+        guard !cache.isEmpty else { return nil }
+        return cache[stableHash(name) % cache.count]
     }
 }
 
