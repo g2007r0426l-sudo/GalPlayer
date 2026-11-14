@@ -180,7 +180,6 @@ targets:
           - "-lSDL2_image"
           - "-lSDL2_ttf"
           - "-lSDL2_mixer"
-          - "-lSDL2stdlib"
           - "-lSDL2"
           - "-lfreetype"
           - "-lvorbisfile"
