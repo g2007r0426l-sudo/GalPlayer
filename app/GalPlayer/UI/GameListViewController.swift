@@ -293,6 +293,13 @@ final class GameListViewController: UIViewController {
         if !searchText.isEmpty {
             list = list.filter { $0.name.localizedCaseInsensitiveContains(searchText) }
         }
+        // 能玩的排前面：大卡（继续上次）取 visible.first，就不会拿一个不可玩的当封面
+        list.sort { a, b in
+            let pa = EngineRegistry.shared.effectiveEngine(for: a).playable
+            let pb = EngineRegistry.shared.effectiveEngine(for: b).playable
+            if pa != pb { return pa }
+            return a.dirMtime > b.dirMtime
+        }
         visible = list
         subtitleLabel.text = "\(visible.count) 部作品"
         collectionView.backgroundView?.isHidden = !visible.isEmpty
@@ -618,7 +625,7 @@ final class HeroCardCell: UICollectionViewCell {
         nameLabel.text = entry.name
         metaLabel.text = "上次游玩 · \(TimeAgo.string(from: entry.dirMtime)) · \(engine.displayName)"
         chip.isHidden = !engine.playable
-        coverView.isDimmed = !engine.playable
+        coverView.isDimmed = !engine.playable || engine == .kirikiri
     }
 }
 
