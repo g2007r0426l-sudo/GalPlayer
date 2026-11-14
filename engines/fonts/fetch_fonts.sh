@@ -4,7 +4,7 @@
 # 用途: 打进 App 包，运行时拷给 Kirikiri/ONS 做中文兜底渲染
 # =============================================================================
 set -euo pipefail
-ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+ROOT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"   # engines/fonts/ -> 仓库根
 FONT_DIR="$ROOT_DIR/app/GalPlayer/Resources"
 FONT="$FONT_DIR/DroidSansFallback.ttf"
 mkdir -p "$FONT_DIR"
