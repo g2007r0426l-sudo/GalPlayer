@@ -98,6 +98,11 @@ echo "[SDL2] OK -> $BUILD_ROOT/lib/libSDL2.a"
 # ---------------------------------------------------------------------------
 # 3b. 安装 SDL2（供 SDL_image/ttf/mixer 的 find_package 定位）+ 构建三件套
 # ---------------------------------------------------------------------------
+# 手动铺设 prefix 布局（SDL_image/ttf/mixer 的 PrivateSDL2 查找需要 lib+include 齐备）
+mkdir -p "$BUILD_ROOT/prefix/lib" "$BUILD_ROOT/prefix/include/SDL2"
+cp -f "$BUILD_ROOT/lib/libSDL2.a" "$BUILD_ROOT/prefix/lib/" 2>/dev/null || true
+cp "$SDL_SRC"/include/*.h "$BUILD_ROOT/prefix/include/SDL2/" 2>/dev/null || true
+find "$BUILD_DIR" -name "SDL_config.h" -exec cp -f {} "$BUILD_ROOT/prefix/include/SDL2/" \; 2>/dev/null || true
 cmake --install "$BUILD_DIR" --prefix "$BUILD_ROOT/prefix" >/dev/null 2>&1 || true
 
 build_sdl_ext() {
@@ -128,6 +133,8 @@ build_sdl_ext() {
             -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF \
             -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
             -DCMAKE_PREFIX_PATH="$BUILD_ROOT/prefix" \
+            -DSDL2_LIBRARY="$BUILD_ROOT/lib/libSDL2.a" \
+            -DSDL2_INCLUDE_DIR="$BUILD_ROOT/include/SDL2" \
             -DCMAKE_INSTALL_PREFIX="$BUILD_ROOT/prefix"
         cmake --build "$ext_build" -j "$(sysctl -n hw.ncpu)"
         local lib=$(find "$ext_build" -name "libSDL2_$name.a" | head -n 1)
