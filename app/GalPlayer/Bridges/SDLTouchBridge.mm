@@ -20,10 +20,14 @@
 #include <mutex>
 #include <thread>
 
+// SDL2 类型/事件 API（禁用 SDL_main.h 的 main 宏污染）
+#define SDL_MAIN_HANDLED 1
+#include <SDL.h>
+
 #include "EngineBridge.h"
 #include "EngineRuntime.hpp"
 
-// SDL2: 不包含 SDL_main.h（避免 main 宏污染），手动声明 iOS 启动入口
+// iOS 启动入口（SDL_main.h 未包含，手动声明）
 extern "C" {
     typedef int (*SDL_main_func)(int argc, char *argv[]);
     int SDL_UIKitRunApp(int argc, char *argv[], SDL_main_func mainFunction);

@@ -30,6 +30,12 @@ settings:
     # 引擎静态库
     LIBRARY_SEARCH_PATHS:
       - "$(SRCROOT)/../build/ios/lib"
+    HEADER_SEARCH_PATHS:
+      - "$(inherited)"
+      - "$(SRCROOT)/../build/ios/include/SDL2"
+      - "$(SRCROOT)/../build/ios/include"
+      - "$(SRCROOT)/../build/ios/include/freetype2"
+      - "$(SRCROOT)/../build/ios/include/jpeg"
     OTHER_LDFLAGS:
       - "-ObjC"
       - "-Wl,-all_load"
@@ -102,6 +108,9 @@ targets:
           - "$(SRCROOT)/../build/ios/lib"
           - "$(SRCROOT)/../build/krkr-ios"
         HEADER_SEARCH_PATHS:
+          - "$(inherited)"
+          - "$(SRCROOT)/../build/ios/include/SDL2"
+          - "$(SRCROOT)/../build/ios/include"
           - "$(SRCROOT)/../build/krkr-ios/include"
           - "$(SRCROOT)/../engines/kirikiroid2/Kirikinux2/src/core"
           - "$(SRCROOT)/../engines/kirikiroid2/Kirikinux2/cocos/kr2"

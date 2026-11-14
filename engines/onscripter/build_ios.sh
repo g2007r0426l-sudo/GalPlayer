@@ -182,6 +182,7 @@ CXX="xcrun -sdk iphoneos clang++"
 ARCH="-arch arm64 -miphoneos-version-min=14.0"
 INC=(-I"$COMPAT_INC" -I"$ONS_DIR" -I"$BUILD_ROOT/include" -I"$BUILD_ROOT/include/SDL2" -I"$BUILD_ROOT/include/freetype2" -I"$BUILD_ROOT/include/jpeg" $OGG_INC)
 CXXFLAGS=(-std=c++14 -O2 $ARCH -fno-objc-arc \
+          -DSDL_MAIN_HANDLED=1 \
           -DLINUX=1 -DCJK=1 -DNDEBUG $OGG_FLAGS "${INC[@]}")
 
 # 选出"入口翻译单元"（定义 main 的那个文件），其余带 main 的工具源码排除
