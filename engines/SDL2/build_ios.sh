@@ -63,6 +63,7 @@ cmake -S "$SDL_SRC" -B "$BUILD_DIR" -G Ninja \
     -DCMAKE_BUILD_TYPE=Release \
     -DBUILD_SHARED_LIBS=OFF \
     -DSDL_STATIC_PIC=ON \
+    -DSDL_LIBC=OFF \
     -DSDL_TEST=OFF -DSDL_TESTS=OFF \
     -DSDL_JOYSTICK=OFF -DSDL_HAPTIC=OFF -DSDL_POWER=OFF \
     -DSDL_RENDER=ON -DSDL_AUDIO=ON -DSDL_VIDEO=ON -DSDL_FILE=ON \
@@ -152,9 +153,9 @@ build_sdl_ext() {
     fi
 }
 
-# SDL_image: 内置 stb 解码器（PNG/JPG），关闭 ImageIO 后端避免 CoreServices 依赖
+# SDL_image: 关闭 ImageIO 后端（避免 CoreServices 依赖），启用内置 stb 解码器
 build_sdl_ext "image" "libsdl-org/SDL_image" "release-2.6.3|release-2.8.4|release-2.8.0" "no" \
-    -DSDL2IMAGE_IMAGEIO=OFF
+    -DSDL2IMAGE_BACKEND_IMAGEIO=OFF -DSDL2IMAGE_BACKEND_STB=ON
 # SDL_ttf: 需要 freetype 子模块（recurse）
 build_sdl_ext "ttf"   "libsdl-org/SDL_ttf"   "release-2.22.1|release-2.20.2|release-2.0.18" "yes"
 # SDL_mixer: 内置解码器（WAV/OGG/FLAC/MP3/MIDI 均为 in-tree）

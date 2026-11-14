@@ -29,9 +29,10 @@ mkdir -p "$BUILD_ROOT/lib"
 if [ ! -d "$KRKR_SRC/.git" ]; then
     rm -rf "$KRKR_SRC"
     echo "[KRKR] clone Kirikiroid2 ..."
-    git clone --depth 1 https://github.com/zzz-ooo/Kirikiroid2.git "$KRKR_SRC" \
+    git clone --depth 1 https://github.com/zeas2/Kirikiroid2.git "$KRKR_SRC" \
+      || git clone --depth 1 https://github.com/kirikiroid2/kirikiroid2.git "$KRKR_SRC" \
       || { echo "[KRKR] ERROR: clone 失败。手动方案:"
-           echo "  git clone https://github.com/zzz-ooo/Kirikiroid2.git '$KRKR_SRC' 后重跑"; exit 1; }
+           echo "  git clone https://github.com/zeas2/Kirikiroid2.git '$KRKR_SRC' 后重跑"; exit 1; }
 fi
 COMMIT=$(git -C "$KRKR_SRC" rev-parse HEAD)
 echo "[KRKR] 源码: $KRKR_SRC @ ${COMMIT:0:12}"
