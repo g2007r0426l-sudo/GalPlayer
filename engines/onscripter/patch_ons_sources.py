@@ -16,6 +16,7 @@ REPLACEMENTS = [
     ("SDL_WarpMouse(", "SDL_WarpMouseInWindow(NULL, ", "SDL_WarpMouse -> SDL_WarpMouseInWindow"),
     ("SDL_mutexP(", "SDL_LockMutex(", "SDL_mutexP -> SDL_LockMutex"),
     ("SDL_mutexV(", "SDL_UnlockMutex(", "SDL_mutexV -> SDL_UnlockMutex"),
+    ("code = CODE_CP932;", "code = CODE_UTF8;", "default encoding CP932 -> UTF-8"),
     # SDL2 键名: 小键盘数字键加下划线（SDLK_KP0 -> SDLK_KP_0）
     ("SDLK_KP0", "SDLK_KP_0", "SDLK_KP0 -> SDLK_KP_0"),
     ("SDLK_KP1", "SDLK_KP_1", "SDLK_KP1 -> SDLK_KP_1"),
