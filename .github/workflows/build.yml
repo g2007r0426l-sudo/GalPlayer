@@ -16,7 +16,7 @@ on:
 
 jobs:
   build:
-    runs-on: macos-latest     # 苹果 Silicon 云端 Mac
+    runs-on: macos-latest  # 苹果 Silicon 云端 Mac
     timeout-minutes: 300
     steps:
       - name: 拉取代码
@@ -25,6 +25,24 @@ jobs:
       - name: 安装构建依赖
         run: |
           brew install cmake ninja xcodegen ldid dpkg
+
+      # ---- 依赖缓存：引擎源码 + 已编译库（大幅缩短每轮迭代时间） ----
+      - name: 缓存引擎源码与产物
+        id: cache-engines
+        uses: actions/cache@v4
+        with:
+          path: |
+            engines/SDL2/SDL
+            engines/SDL2/SDL_image
+            engines/SDL2/SDL_ttf
+            engines/SDL2/SDL_mixer
+            engines/onscripter/src
+            engines/onscripter/thirdparty
+            engines/kirikiroid2/Kirikinux2
+            build/ios
+          key: engines-${{ hashFiles('engines/**/*.sh', 'engines/**/*.py', 'engines/**/*.h', 'engines/**/*.cpp', 'engines/**/*.mm') }}
+          restore-keys: |
+            engines-
 
       - name: 一键全量构建（字体→SDL2→ONScripter→Kirikiri→App→.deb）
         run: |
@@ -47,5 +65,6 @@ jobs:
           path: |
             engines/onscripter/src/**/*.orig
             build/sdl2-ios/CMakeCache.txt
+            build/krkr-ios/CMakeCache.txt
             THIRD_PARTY_RESOLVED.md
           if-no-files-found: ignore
