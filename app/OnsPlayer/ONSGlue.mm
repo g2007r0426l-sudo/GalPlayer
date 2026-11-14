@@ -143,11 +143,11 @@ static void requestBackToLibrary(void) {
     gBackDone = true;
     openLibraryURL();
     // 给系统一点时间切换，再结束本进程
-    usleep(400 * 1000);
+    usleep(1500 * 1000);   // 等 SpringBoard 完成 App 切换
     exit(0);
 }
 
-static void atexitBack(void) { openLibraryURL(); }
+static void atexitBack(void) { openLibraryURL(); usleep(1500 * 1000); }
 
 // ---------------------------------------------------------------------------
 // frame view with touch handling
