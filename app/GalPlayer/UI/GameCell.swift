@@ -108,10 +108,17 @@ final class GameCell: UICollectionViewCell {
         case .unknown:    engineChip.set(text: "未知", color: Theme.badgeOff)
         }
 
-        let playable = engine.playable
+        // Kirikiri 在本机不可用（GPU 受限）：列表里直接标灰并说明，避免点开才报错
+        let playable = engine.playable && engine != .kirikiri
         coverView.isDimmed = !playable
         nameLabel.text = entry.name
         nameLabel.textColor = playable ? Theme.text : Theme.textSub
-        metaLabel.text = playable ? "本地游戏 · \(TimeAgo.string(from: entry.dirMtime))" : "建议用 Artroid+ 打开"
+        if engine == .kirikiri {
+            metaLabel.text = "本机暂不支持（GPU 受限）"
+        } else {
+            metaLabel.text = playable
+                ? "本地游戏 · \(TimeAgo.string(from: entry.dirMtime))"
+                : "建议用 Artroid+ 打开"
+        }
     }
 }

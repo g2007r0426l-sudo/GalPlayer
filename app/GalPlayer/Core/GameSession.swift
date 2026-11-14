@@ -49,8 +49,8 @@ final class GameSession {
         let bundleID: String
         switch engine {
         case .kirikiri:
-            markerName = ".krkr_launch"
-            bundleID = "com.yg.kirikinux2"
+            completion(.failure(SessionError("这台设备暂不支持 Kirikiri2（.xp3）：\nApp 进程拿不到 GPU，cocos 渲染起不来。\n请优先玩 ONScripter 引擎的游戏。")))
+            return
         case .onscripter:
             markerName = ".ons_launch"
             bundleID = "com.yg.onsplayer"
