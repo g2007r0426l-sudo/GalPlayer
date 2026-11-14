@@ -33,6 +33,24 @@ enum CoverArt {
 
     static var isAvailable: Bool { !cache.isEmpty }
 
+    /// 横版封面（16:9），专供「继续上次」大卡，避免竖版被裁掉人脸
+    private static let wideCache: [UIImage] = {
+        var imgs: [UIImage] = []
+        for i in 1...count {
+            if let p = Bundle.main.path(forResource: "wide\(i)", ofType: "jpg"),
+               let img = UIImage(contentsOfFile: p) {
+                imgs.append(img)
+            }
+        }
+        NSLog("[GalPlayer] 横版封面加载: \(imgs.count)/\(count) 张")
+        return imgs
+    }()
+
+    static func heroImage(for name: String) -> UIImage? {
+        if !wideCache.isEmpty { return wideCache[stableHash(name) % wideCache.count] }
+        return image(for: name)
+    }
+
     static func index(for name: String) -> Int {
         stableHash(name) % max(cache.count, 1)
     }

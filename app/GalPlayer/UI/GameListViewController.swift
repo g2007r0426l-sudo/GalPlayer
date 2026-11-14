@@ -562,7 +562,7 @@ final class HeroCardCell: UICollectionViewCell {
 
     func configure(with entry: GameEntry, engine: GameEngine) {
         coverView.title = entry.name
-        coverView.coverImage = CoverArt.image(for: entry.name)
+        coverView.coverImage = CoverArt.heroImage(for: entry.name)
         nameLabel.text = entry.name
         metaLabel.text = "上次游玩 · \(TimeAgo.string(from: entry.dirMtime)) · \(engine.displayName)"
         chip.isHidden = !engine.playable

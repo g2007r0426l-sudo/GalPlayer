@@ -10,6 +10,28 @@
 	<string>OnsPlayer</string>
 	<key>CFBundleIdentifier</key>
 	<string>com.yg.onsplayer</string>
+	<key>CFBundleIconFiles</key>
+	<array>
+		<string>Icon</string>
+		<string>Icon-Small</string>
+		<string>Icon-60</string>
+		<string>Icon-72</string>
+		<string>Icon-76</string>
+		<string>Icon-83.5</string>
+	</array>
+	<key>CFBundleIcons</key>
+	<dict>
+		<key>CFBundlePrimaryIcon</key>
+		<dict>
+			<key>CFBundleIconFiles</key>
+			<array>
+				<string>Icon</string>
+				<string>Icon-60</string>
+				<string>Icon-76</string>
+				<string>Icon-83.5</string>
+			</array>
+		</dict>
+	</dict>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
