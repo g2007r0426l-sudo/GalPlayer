@@ -1,4 +1,6 @@
 #!/bin/sh
-# 卸载/升级前: 结束运行中的 GalPlayer
+# 卸载/升级前: 结束运行中的 App
 killall GalPlayer 2>/dev/null
+killall OnsPlayer 2>/dev/null
+killall Kirikinux2 2>/dev/null
 exit 0

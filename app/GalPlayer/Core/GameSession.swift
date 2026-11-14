@@ -2,13 +2,18 @@ import Foundation
 import UIKit
 
 // =============================================================================
-// 游戏会话 —— 统一的引擎生命周期管理
+// 游戏会话 —— 统一启动器
 //
-//   进入游戏: 主 UI 暂停 -> SDL 窗口由引擎线程全屏接管
-//   退出游戏: 引擎收到 SDL_QUIT 自然退出 -> 回调 -> 回到列表
+// 架构（实测得出的唯一可行方案）:
+//   引擎跑在**独立 App**里（SDL2/cocos2d-x 都需要自己拥有 UIApplication 生命周期，
+//   在已有 UIKit App 里进程内启动会因重复调用 UIApplicationMain 而崩溃）。
+//
+//   GalPlayer 只做三件事:
+//     1. 把目标路径写入标记文件 /var/mobile/Documents/Galgames/.<engine>_launch
+//     2. 通过 LSApplicationWorkspace 拉起对应播放器 App
+//     3. 播放器读取标记（一次性消费）后直接全屏进游戏
 // =============================================================================
 
-/// 会话错误（Result 的 Failure 类型）
 struct SessionError: LocalizedError {
     let message: String
     init(_ message: String) { self.message = message }
@@ -19,19 +24,14 @@ final class GameSession {
     static let shared = GameSession()
 
     private(set) var current: GameEntry?
-    /// 引擎完全退出后的 UI 收尾（主线程）
     var onStopped: (() -> Void)?
 
-    private init() {
-        GP_SetStoppedCallback {
-            // 引擎线程上回调，转主线程
-            DispatchQueue.main.async {
-                GameSession.shared.handleEngineStopped()
-            }
-        }
-    }
+    private let gamesRoot = "/var/mobile/Documents/Galgames"
 
-    var isRunning: Bool { GP_EngineIsRunning() != 0 }
+    private init() {}
+
+    /// 引擎是否在本进程内运行（独立 App 架构下恒为 false，保留接口以兼容旧调用）
+    var isRunning: Bool { false }
 
     func start(entry: GameEntry, completion: @escaping (Result<Void, SessionError>) -> Void) {
         let engine = EngineRegistry.shared.effectiveEngine(for: entry)
@@ -44,81 +44,84 @@ final class GameSession {
             return
         }
 
-        // KRKR 引擎: 双 App 架构 —— 写启动标记文件并拉起 Kirikinux2 独立 App
-        if engine == .kirikiri {
-            do {
-                let marker = try krkrLaunchMarker(for: entry)
-                try marker.write(to: URL(fileURLWithPath: "/var/mobile/Documents/Galgames/.krkr_launch"),
-                                 atomically: true, encoding: .utf8)
-                openBundle("com.yg.kirikinux2")
-                completion(.success(()))
-            } catch {
-                completion(.failure(SessionError("启动标记写入失败: \(error.localizedDescription)")))
-            }
+        // 引擎 → (标记文件, 播放器 Bundle ID)
+        let markerName: String
+        let bundleID: String
+        switch engine {
+        case .kirikiri:
+            markerName = ".krkr_launch"
+            bundleID = "com.yg.kirikinux2"
+        case .onscripter:
+            markerName = ".ons_launch"
+            bundleID = "com.yg.onsplayer"
+        default:
+            completion(.failure(SessionError("引擎不可用")))
             return
         }
 
-        // ONScripter: 进程内 SDL2 会话
-        guard !isRunning else {
-            completion(.failure(SessionError("已有游戏在运行，请先退出")))
+        // 播放器是否已安装
+        guard isInstalled(bundleID) else {
+            let name = engine == .kirikiri ? "Kirikinux2" : "ONS 播放器"
+            completion(.failure(SessionError("未找到「\(name)」App。请重新安装完整 .deb（应包含三个 App）")))
             return
         }
 
-        let settings = AppSettings.shared
-        let fontPath = Bundle.main.path(forResource: "DroidSansFallback", ofType: "ttf")
-
-        let kind: Int32 = 1   // GP_ENGINE_ONSCRIPTER
-        let rc = GP_EngineStart(kind,
-                                entry.path,
-                                fontPath,
-                                nil,
-                                settings.stretchFullscreen ? 1 : 0,
-                                settings.textSpeed)
-
-        if rc == 0 {
+        do {
+            let target = try launchTarget(for: entry, engine: engine)
+            let markerPath = gamesRoot + "/" + markerName
+            try target.write(to: URL(fileURLWithPath: markerPath), atomically: true, encoding: .utf8)
+            openBundle(bundleID)
             current = entry
             completion(.success(()))
-        } else {
-            completion(.failure(SessionError(rc == -1 ? "引擎已在运行" : "启动失败（错误码 \(rc)），详见 TROUBLESHOOTING.md")))
+        } catch {
+            completion(.failure(SessionError("启动标记写入失败: \(error.localizedDescription)")))
         }
-    }
-
-    /// Kirikinux2 启动规则（与引擎 TVPCheckStartupArg 一致）:
-    /// 目录含 startup.tjs → 传目录；否则传第一个 xp3 文件路径
-    private func krkrLaunchMarker(for entry: GameEntry) throws -> String {
-        let fm = FileManager.default
-        let dirURL = URL(fileURLWithPath: entry.path)
-        let hasStartupTJS = (try? fm.contentsOfDirectory(atPath: entry.path))?.contains(where: {
-            $0.lowercased() == "startup.tjs"
-        }) ?? false
-
-        if hasStartupTJS {
-            return entry.path
-        }
-        if let xp3 = Scanner.shared.findFirstXp3(inDir: entry.path) {
-            return entry.path + "/" + xp3
-        }
-        return dirURL.path
-    }
-
-    /// 越狱环境私有 API: 拉起另一个 App（LSApplicationWorkspace）
-    private func openBundle(_ bundleID: String) {
-        guard let cls = NSClassFromString("LSApplicationWorkspace") as? NSObject.Type,
-              let workspace = cls.perform(NSSelectorFromString("defaultWorkspace"))?.takeUnretainedValue() as? NSObject else {
-            NSLog("[GalPlayer] LSApplicationWorkspace 不可用")
-            return
-        }
-        _ = workspace.perform(NSSelectorFromString("openApplicationWithBundleID:"), with: bundleID)
     }
 
     func stop() {
-        guard isRunning else { return }
-        GP_EngineStop()
+        // 独立进程由播放器自己的退出逻辑处理
     }
 
-    private func handleEngineStopped() {
-        current = nil
-        NotificationCenter.default.post(name: .engineStopped, object: nil)
-        onStopped?()
+    // -------------------------------------------------------------------------
+    /// 引擎启动入口规则（与各引擎的自动探测一致）
+    private func launchTarget(for entry: GameEntry, engine: GameEngine) throws -> String {
+        let fm = FileManager.default
+        let names = (try? fm.contentsOfDirectory(atPath: entry.path)) ?? []
+        let lower = names.map { $0.lowercased() }
+
+        if engine == .kirikiri {
+            if lower.contains("startup.tjs") { return entry.path }
+            if let xp3 = Scanner.shared.findFirstXp3(inDir: entry.path) {
+                return entry.path + "/" + xp3
+            }
+            return entry.path
+        }
+        // ONScripter: 传给引擎的是一个已 chdir 的目录，脚本由其自行探测
+        return entry.path
+    }
+
+    /// 是否安装了指定 bundle 的 App（越狱环境私有 API）
+    private func isInstalled(_ bundleID: String) -> Bool {
+        guard let cls = NSClassFromString("LSApplicationWorkspace") as? NSObject.Type,
+              let ws = cls.perform(NSSelectorFromString("defaultWorkspace"))?.takeUnretainedValue() as? NSObject else {
+            return false
+        }
+        let sel = NSSelectorFromString("applicationIsInstalled:")
+        if ws.responds(to: sel) {
+            typealias Fn = @convention(c) (AnyObject, Selector, NSString) -> Bool
+            let imp = ws.method(for: sel)
+            let fn = unsafeBitCast(imp, to: Fn.self)
+            return fn(ws, sel, bundleID as NSString)
+        }
+        return true // 无法判断时不阻塞
+    }
+
+    private func openBundle(_ bundleID: String) {
+        guard let cls = NSClassFromString("LSApplicationWorkspace") as? NSObject.Type,
+              let ws = cls.perform(NSSelectorFromString("defaultWorkspace"))?.takeUnretainedValue() as? NSObject else {
+            NSLog("[GalPlayer] LSApplicationWorkspace 不可用")
+            return
+        }
+        _ = ws.perform(NSSelectorFromString("openApplicationWithBundleID:"), with: bundleID)
     }
 }

@@ -1,6 +1,10 @@
 # =============================================================================
-# XcodeGen 工程定义 —— 生成: xcodegen generate （在 app/ 目录执行）
-# 纯代码 UIKit，无 storyboard；引擎静态库通过 OTHER_LDFLAGS 链接
+# XcodeGen 工程定义 —— 三个 App 目标
+#   GalPlayer   纯 Swift UI 外壳（扫描/列表/设置，不含任何引擎代码）
+#   OnsPlayer   ONScripter 播放器（SDL2 应用，独立生命周期）
+#   Kirikinux2  Kirikiri2 播放器（cocos2d-x 应用，二期）
+#
+# 生成: xcodegen generate （在 app/ 目录执行）
 # =============================================================================
 name: GalPlayer
 options:
@@ -13,21 +17,13 @@ settings:
   base:
     SWIFT_VERSION: "5.9"
     CLANG_ENABLE_MODULES: "YES"
-    # 越狱 App: 构建期不签名，ldid 在打包脚本里递归签名
     CODE_SIGN_STYLE: Manual
     CODE_SIGN_IDENTITY: ""
     CODE_SIGNING_REQUIRED: "NO"
     CODE_SIGNING_ALLOWED: "NO"
     ENABLE_BITCODE: "NO"
-    TARGETED_DEVICE_FAMILY: "2"          # iPad
     ONLY_ACTIVE_ARCH: "NO"
     ARCHS: "arm64"
-    SWIFT_OBJC_BRIDGING_HEADER: "$(SRCROOT)/GalPlayer/GalPlayer-Bridging-Header.h"
-    INFOPLIST_FILE: "$(SRCROOT)/GalPlayer/Info.plist"
-    PRODUCT_BUNDLE_IDENTIFIER: com.yg.galplayer
-    MARKETING_VERSION: "0.1.0"
-    CURRENT_PROJECT_VERSION: "1"
-    # 引擎静态库
     LIBRARY_SEARCH_PATHS:
       - "$(SRCROOT)/../build/ios/lib"
     HEADER_SEARCH_PATHS:
@@ -36,66 +32,9 @@ settings:
       - "$(SRCROOT)/../build/ios/include"
       - "$(SRCROOT)/../build/ios/include/freetype2"
       - "$(SRCROOT)/../build/ios/include/jpeg"
-    OTHER_LDFLAGS:
-      - "-ObjC"
-      - "-Wl,-all_load"
-      - "-lc++"
-      - "-lSDL2"
-      - "-lons"
-      - "-lfreetype"
-      - "-ljpeg"
-      - "-lvorbisfile"
-      - "-lvorbis"
-      - "-logg"
-      - "-lSDL2_image"
-      - "-lSDL2_ttf"
-      - "-lSDL2_mixer"
-      - "-liconv"
-      - "-lbz2"
-      - "-lz"
-      # 系统框架（逐项列出，xcodegen 会拼成 -framework X）
-      - "-framework"
-      - "CoreBluetooth"
-      - "-framework"
-      - "GameController"
-      - "-framework"
-      - "CoreMotion"
-      - "-framework"
-      - "CoreHaptics"
-      - "-framework"
-      - "CoreAudio"
-      - "-framework"
-      - "AudioToolbox"
-      - "-framework"
-      - "AVFoundation"
-      - "-framework"
-      - "CoreMedia"
-      - "-framework"
-      - "CoreGraphics"
-      - "-framework"
-      - "QuartzCore"
-      - "-framework"
-      - "CoreText"
-      - "-framework"
-      - "CoreFoundation"
-      - "-framework"
-      - "UIKit"
-      - "-framework"
-      - "Foundation"
-      - "-framework"
-      - "OpenGLES"
-      - "-framework"
-      - "Metal"
-      - "-framework"
-      - "MediaPlayer"
-      - "-framework"
-      - "MobileCoreServices"
-      - "-framework"
-      - "ImageIO"
-    OTHER_CPLUSPLUSFLAGS:
-      - "-std=c++14"
 
 targets:
+  # ---------------------------------------------------------------- UI 外壳
   GalPlayer:
     type: application
     platform: iOS
@@ -103,27 +42,93 @@ targets:
       - path: GalPlayer
         excludes:
           - "Info.plist"
-          - "Bridges/KrkrBridge.mm"   # KRKR 走独立 App，主 App 内不编译
-    # SDL2 在 iOS 上需要的系统框架
+          - "Bridges/**"        # 引擎桥接已迁移到各播放器 App
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.yg.galplayer
+        INFOPLIST_FILE: "$(SRCROOT)/GalPlayer/Info.plist"
+        TARGETED_DEVICE_FAMILY: "2"
+        OTHER_LDFLAGS:
+          - "-ObjC"
+          - "-lc++"
     frameworks:
       - sdk: UIKit.framework
       - sdk: Foundation.framework
       - sdk: CoreGraphics.framework
       - sdk: QuartzCore.framework
       - sdk: CoreText.framework
-      - sdk: OpenGLES.framework
-      - sdk: Metal.framework
-      - sdk: AVFoundation.framework
-      - sdk: AudioToolbox.framework
-      - sdk: CoreAudio.framework
-      - sdk: CoreMedia.framework
-      - sdk: CoreMotion.framework
       - sdk: MediaPlayer.framework
-      - sdk: CoreFoundation.framework
-      - sdk: MobileCoreServices.framework
-      - sdk: ImageIO.framework
 
-  # KRKR 引擎独立 App（cocos2d-x + Kirikiroid2 核心，双 App 架构）
+  # ------------------------------------------------------- ONScripter 播放器
+  OnsPlayer:
+    type: application
+    platform: iOS
+    sources:
+      - path: OnsPlayer
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.yg.onsplayer
+        INFOPLIST_FILE: "$(SRCROOT)/OnsPlayer-Info.plist"
+        TARGETED_DEVICE_FAMILY: "2"
+        OTHER_CPLUSPLUSFLAGS:
+          - "-std=c++14"
+        OTHER_LDFLAGS:
+          - "-ObjC"
+          - "-Wl,-all_load"
+          - "-lc++"
+          - "-lSDL2"
+          - "-lons"
+          - "-lSDL2_image"
+          - "-lSDL2_ttf"
+          - "-lSDL2_mixer"
+          - "-lfreetype"
+          - "-ljpeg"
+          - "-lvorbisfile"
+          - "-lvorbis"
+          - "-logg"
+          - "-liconv"
+          - "-lbz2"
+          - "-lz"
+          - "-framework"
+          - "CoreBluetooth"
+          - "-framework"
+          - "GameController"
+          - "-framework"
+          - "CoreMotion"
+          - "-framework"
+          - "CoreHaptics"
+          - "-framework"
+          - "CoreAudio"
+          - "-framework"
+          - "AudioToolbox"
+          - "-framework"
+          - "AVFoundation"
+          - "-framework"
+          - "CoreMedia"
+          - "-framework"
+          - "CoreGraphics"
+          - "-framework"
+          - "QuartzCore"
+          - "-framework"
+          - "CoreText"
+          - "-framework"
+          - "CoreFoundation"
+          - "-framework"
+          - "UIKit"
+          - "-framework"
+          - "Foundation"
+          - "-framework"
+          - "OpenGLES"
+          - "-framework"
+          - "Metal"
+          - "-framework"
+          - "MediaPlayer"
+          - "-framework"
+          - "MobileCoreServices"
+          - "-framework"
+          - "ImageIO"
+
+  # --------------------------------------------------------- Kirikiri 播放器
   Kirikinux2:
     type: application
     platform: iOS
@@ -134,16 +139,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.yg.kirikinux2
         INFOPLIST_FILE: "$(SRCROOT)/Kirikinux2-Info.plist"
-        CODE_SIGN_STYLE: Manual
-        CODE_SIGN_IDENTITY: ""
-        CODE_SIGNING_REQUIRED: "NO"
-        CODE_SIGNING_ALLOWED: "NO"
-        ENABLE_BITCODE: "NO"
         TARGETED_DEVICE_FAMILY: "1,2"
-        ONLY_ACTIVE_ARCH: "NO"
-        ARCHS: "arm64"
-        CLANG_ENABLE_MODULES: "YES"
-        SWIFT_OBJC_BRIDGING_HEADER: ""
         LIBRARY_SEARCH_PATHS:
           - "$(SRCROOT)/../build/ios/lib"
           - "$(SRCROOT)/../build/krkr-ios"
@@ -230,22 +226,3 @@ targets:
           - "ImageIO"
           - "-framework"
           - "MobileCoreServices"
-    frameworks:
-      - sdk: UIKit.framework
-      - sdk: Foundation.framework
-      - sdk: CoreGraphics.framework
-      - sdk: QuartzCore.framework
-      - sdk: OpenGLES.framework
-      - sdk: GLKit.framework
-      - sdk: Metal.framework
-      - sdk: MetalKit.framework
-      - sdk: OpenAL.framework
-      - sdk: AVFoundation.framework
-      - sdk: AudioToolbox.framework
-      - sdk: CoreAudio.framework
-      - sdk: CoreMotion.framework
-      - sdk: CoreText.framework
-      - sdk: CoreFoundation.framework
-      - sdk: ImageIO.framework
-      - sdk: MobileCoreServices.framework
-      - sdk: GameKit.framework
