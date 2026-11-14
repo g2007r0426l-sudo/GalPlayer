@@ -101,10 +101,19 @@ echo "[SDL2] OK -> $BUILD_ROOT/lib/libSDL2.a"
 # 手动铺设 prefix 布局（SDL_image/ttf/mixer 的 PrivateSDL2 查找需要 lib+include 齐备）
 mkdir -p "$BUILD_ROOT/prefix/lib" "$BUILD_ROOT/prefix/include/SDL2"
 cp -f "$BUILD_ROOT/lib/libSDL2.a" "$BUILD_ROOT/prefix/lib/" 2>/dev/null || true
-cp "$BUILD_ROOT"/include/SDL2/*.h "$BUILD_ROOT/prefix/include/SDL2/" 2>/dev/null || true
-find "$BUILD_DIR" -name "SDL_config.h" -exec cp -f {} "$BUILD_ROOT/prefix/include/SDL2/" \; 2>/dev/null || true
-cmake --install "$BUILD_DIR" --prefix "$BUILD_ROOT/prefix" >/dev/null 2>&1 || true
-find "$BUILD_DIR" -name "SDL_config.h" -exec cp -f {} "$BUILD_ROOT/prefix/include/SDL2/" \; 2>/dev/null || true
+cmake --install "$BUILD_DIR" --prefix "$BUILD_ROOT/prefix" > "$ROOT_DIR/build/sdl2_install.log" 2>&1 \
+    && echo "[SDL2] install OK" || { echo "[SDL2] install FAILED:"; tail -5 "$ROOT_DIR/build/sdl2_install.log"; }
+# 校验 SDL_config.h 是生成版（含 HAVE_STDINT_H）；否则从构建目录找最大的生成版
+if ! grep -q "HAVE_STDINT_H" "$BUILD_ROOT/prefix/include/SDL2/SDL_config.h" 2>/dev/null; then
+    GEN=$(find "$BUILD_DIR" -name "SDL_config.h" -size +2k 2>/dev/null | head -n 1)
+    if [ -n "$GEN" ]; then cp -f "$GEN" "$BUILD_ROOT/prefix/include/SDL2/SDL_config.h"; echo "[SDL2] config 用构建目录生成版: $GEN"; fi
+fi
+cp -f "$BUILD_ROOT"/prefix/include/SDL2/*.h "$BUILD_ROOT/include/SDL2/" 2>/dev/null || true
+if grep -q "HAVE_STDINT_H" "$BUILD_ROOT/include/SDL2/SDL_config.h" 2>/dev/null; then
+    echo "[SDL2] SDL_config.h 校验: 生成版 OK"
+else
+    echo "[SDL2] WARNING: SDL_config.h 仍是模板版！后续编译会失败"
+fi
 
 build_sdl_ext() {
     local name="$1"; local repo="$2"; local tags="$3"; local recurse="$4"
@@ -138,6 +147,7 @@ build_sdl_ext() {
             -DCMAKE_PREFIX_PATH="$BUILD_ROOT/prefix" \
             -DSDL2_LIBRARY="$BUILD_ROOT/lib/libSDL2.a" \
             -DSDL2_INCLUDE_DIR="$BUILD_ROOT/include/SDL2" \
+            -DBUILD_TESTING=OFF -DSDL2IMAGE_SAMPLES=OFF -DSDL2IMAGE_TESTS=OFF \
             -DCMAKE_INSTALL_PREFIX="$BUILD_ROOT/prefix" \
             "${extra_flags[@]}"
         cmake --build "$ext_build" -j "$(sysctl -n hw.ncpu)"
