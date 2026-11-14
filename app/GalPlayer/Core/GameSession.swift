@@ -69,7 +69,10 @@ final class GameSession {
         do {
             let target = try launchTarget(for: entry, engine: engine)
             let markerPath = gamesRoot + "/" + markerName
-            try target.write(to: URL(fileURLWithPath: markerPath), atomically: true, encoding: .utf8)
+            // 标记文件: 第 1 行 = 启动目标；第 2 行 = 拉伸全屏(1)/等比(0)
+            let stretch = AppSettings.shared.stretchFullscreen ? "1" : "0"
+            let payload = target + "\n" + stretch + "\n"
+            try payload.write(to: URL(fileURLWithPath: markerPath), atomically: true, encoding: .utf8)
             openBundle(bundleID)
             current = entry
             completion(.success(()))

@@ -46,6 +46,7 @@ static int    gGameW = 640, gGameH = 480;
 static UIView *gFrameView = nil;
 static UIWindow *gWindow = nil;
 static volatile bool gSkipMode = false;
+static bool gFillScreen = false;   // true = 拉伸铺满，false = 等比黑边
 static bool   gSingleDown = false;
 static CGPoint gLastPoint = CGPointMake(0, 0);
 
@@ -109,6 +110,7 @@ static void present_pixels(const void *px, int w, int h, int pitch) {
         if (ctx) {
             CGImageRef img = CGBitmapContextCreateImage(ctx);
             if (img) {
+                gFrameView.layer.contentsGravity = gFillScreen ? kCAGravityResize : kCAGravityResizeAspect;
                 gFrameView.layer.contents = (__bridge id)img;
                 CGImageRelease(img);
             }
@@ -242,6 +244,7 @@ int GP_ONS_Entry(int argc, char **argv) {
 
     // marker
     std::string gameDir;
+    int stretch = 0;
     if (FILE *fp = fopen(K_MARKER, "r")) {
         char line[1024];
         if (fgets(line, sizeof(line), fp)) {
@@ -249,6 +252,8 @@ int GP_ONS_Entry(int argc, char **argv) {
             while (n && (line[n-1] == '\n' || line[n-1] == '\r')) line[--n] = 0;
             gameDir = line;
         }
+        // 第 2 行 = 是否拉伸全屏
+        if (fgets(line, sizeof(line), fp)) stretch = (line[0] == '1') ? 1 : 0;
         fclose(fp);
         unlink(K_MARKER);
     }
@@ -276,7 +281,8 @@ int GP_ONS_Entry(int argc, char **argv) {
     SDL_SetHint(SDL_HINT_ORIENTATIONS, "LandscapeLeft LandscapeRight");
     SDL_SetHint(SDL_HINT_TOUCH_MOUSE_EVENTS, "0");
     SDL_SetHint(SDL_HINT_MOUSE_TOUCH_EVENTS, "0");
-    onsdl_set_scale_mode(0);
+    gFillScreen = (stretch != 0);
+    onsdl_set_scale_mode(stretch);
 
     std::string a0 = "onscripter";
     std::string fontPath;
