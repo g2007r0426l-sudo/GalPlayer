@@ -23,6 +23,22 @@
 extern "C" {
 #endif
 
+// ---- SDL1.2 遗留类型/常量（iOS 无滚轮与键盘，仅供编译通过） ----
+typedef SDL_Keycode SDLKey;   // SDL1.2: SDLKey → SDL2: SDL_Keycode
+
+#ifndef SDL_BUTTON_WHEELUP
+#define SDL_BUTTON_WHEELUP  4
+#endif
+#ifndef SDL_BUTTON_WHEELDOWN
+#define SDL_BUTTON_WHEELDOWN 5
+#endif
+
+// SDL_VIDEOEXPOSE: SDL2 已移除该事件类型。映射到一个 SDL 永远不会产生的
+// 保留事件值，使 case 标签可编译且运行期不可达（全屏 iOS 无 expose 场景）。
+#ifndef SDL_VIDEOEXPOSE
+#define SDL_VIDEOEXPOSE 0x7F00
+#endif
+
 // ---- SDL1.2 独有常量（SDL2 已移除/改名） ----
 #ifndef SDL_SWSURFACE
 #define SDL_SWSURFACE 0x00000000u
