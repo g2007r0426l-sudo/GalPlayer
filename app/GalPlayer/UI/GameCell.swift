@@ -109,11 +109,13 @@ final class GameCell: UICollectionViewCell {
         }
 
         // Kirikiri 在本机不可用（GPU 受限）：列表里直接标灰并说明，避免点开才报错
-        let playable = engine.playable && engine != .kirikiri
+        let playable = (engine == .onscripter) || (engine == .artemis && ArtroidHandoff.isInstalled())
         coverView.isDimmed = !playable
         nameLabel.text = entry.name
         nameLabel.textColor = playable ? Theme.text : Theme.textSub
-        if engine == .kirikiri {
+        if engine == .artemis {
+            metaLabel.text = "点卡片 → 交给 Artroid+ 播放"
+        } else if engine == .kirikiri {
             metaLabel.text = "本机暂不支持（GPU 受限）"
         } else {
             metaLabel.text = playable

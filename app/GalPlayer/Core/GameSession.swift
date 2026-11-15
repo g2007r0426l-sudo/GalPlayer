@@ -35,12 +35,24 @@ final class GameSession {
 
     func start(entry: GameEntry, completion: @escaping (Result<Void, SessionError>) -> Void) {
         let engine = EngineRegistry.shared.effectiveEngine(for: entry)
-        guard engine.playable else {
-            if engine == .artemis {
-                completion(.failure(SessionError("Artemis 引擎（root.pfs）一期暂不支持，建议用 Artroid+ 打开")))
-            } else {
-                completion(.failure(SessionError("无法识别引擎，请在长按菜单中手动指定")))
+
+        // Artemis 引擎：本机我们跑不了，但可以把游戏交给 Artroid+（Artemis 官方 iOS 播放器）
+        if engine == .artemis {
+            guard ArtroidHandoff.isInstalled() else {
+                completion(.failure(SessionError("这是 Artemis 引擎游戏（root.pfs）。\n本机需要安装 Artroid+ 才能玩，装好后我再帮你交接。")))
+                return
             }
+            do {
+                try ArtroidHandoff.handOff(gamePath: entry.path, gameName: entry.name)
+                completion(.success(()))
+            } catch {
+                completion(.failure(SessionError("交给 Artroid+ 失败：\(error.localizedDescription)")))
+            }
+            return
+        }
+
+        guard engine.playable else {
+            completion(.failure(SessionError("无法识别引擎，请检查游戏目录里是否有 nscript.dat / 0.txt / *.xp3 / root.pfs")))
             return
         }
 
