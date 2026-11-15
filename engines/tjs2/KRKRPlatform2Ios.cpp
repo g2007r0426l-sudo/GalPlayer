@@ -79,45 +79,36 @@ void TVPRelinquishCPU() {}
 
 // ---------------------------------------------------------------------------
 // 图像编解码注册桩（PNG/WEBP/BPG/JXR/PVRv3）—— 阶段一返回失败
+// 签名严格按 GraphicsLoaderIntf.h（void 返回 + typedef 回调）
 // 真实解码后续接 SDL2_image（IMG_Load）或 ImageIO
 // ---------------------------------------------------------------------------
-static bool codecStub() { return false; }
+static void codecStub() {}
 
-bool TVPLoadPNG(void *, void *,
-                int (*)(void *, unsigned int, unsigned int, tTVPGraphicPixelFormat),
-                void *(*)(void *, int),
-                void (*)(void *, const ttstr &, const ttstr &),
-                tTJSBinaryStream *, int, tTVPGraphicLoadMode) { return codecStub(); }
-bool TVPLoadWEBP(void *, void *,
-                 int (*)(void *, unsigned int, unsigned int, tTVPGraphicPixelFormat),
-                 void *(*)(void *, int),
-                 void (*)(void *, const ttstr &, const ttstr &),
-                 tTJSBinaryStream *, int, tTVPGraphicLoadMode) { return codecStub(); }
-bool TVPLoadBPG(void *, void *,
-                int (*)(void *, unsigned int, unsigned int, tTVPGraphicPixelFormat),
-                void *(*)(void *, int),
-                void (*)(void *, const ttstr &, const ttstr &),
-                tTJSBinaryStream *, int, tTVPGraphicLoadMode) { return codecStub(); }
-bool TVPLoadJXR(void *, void *,
-                int (*)(void *, unsigned int, unsigned int, tTVPGraphicPixelFormat),
-                void *(*)(void *, int),
-                void (*)(void *, const ttstr &, const ttstr &),
-                tTJSBinaryStream *, int, tTVPGraphicLoadMode) { return codecStub(); }
-bool TVPLoadPVRv3(void *, void *,
-                  int (*)(void *, unsigned int, unsigned int, tTVPGraphicPixelFormat),
-                  void *(*)(void *, int),
-                  void (*)(void *, const ttstr &, const ttstr &),
-                  tTJSBinaryStream *, int, tTVPGraphicLoadMode) { return codecStub(); }
+void TVPLoadPNG(void *formatdata, void *callbackdata, tTVPGraphicSizeCallback sizecallback,
+                tTVPGraphicScanLineCallback scanlinecallback, tTVPMetaInfoPushCallback metainfopushcallback,
+                tTJSBinaryStream *src, tjs_int keyidx, tTVPGraphicLoadMode mode) { codecStub(); }
+void TVPLoadWEBP(void *formatdata, void *callbackdata, tTVPGraphicSizeCallback sizecallback,
+                 tTVPGraphicScanLineCallback scanlinecallback, tTVPMetaInfoPushCallback metainfopushcallback,
+                 tTJSBinaryStream *src, tjs_int keyidx, tTVPGraphicLoadMode mode) { codecStub(); }
+void TVPLoadBPG(void *formatdata, void *callbackdata, tTVPGraphicSizeCallback sizecallback,
+                tTVPGraphicScanLineCallback scanlinecallback, tTVPMetaInfoPushCallback metainfopushcallback,
+                tTJSBinaryStream *src, tjs_int keyidx, tTVPGraphicLoadMode mode) { codecStub(); }
+void TVPLoadJXR(void *formatdata, void *callbackdata, tTVPGraphicSizeCallback sizecallback,
+                tTVPGraphicScanLineCallback scanlinecallback, tTVPMetaInfoPushCallback metainfopushcallback,
+                tTJSBinaryStream *src, tjs_int keyidx, tTVPGraphicLoadMode mode) { codecStub(); }
+void TVPLoadPVRv3(void *formatdata, void *callbackdata, tTVPGraphicSizeCallback sizecallback,
+                  tTVPGraphicScanLineCallback scanlinecallback, tTVPMetaInfoPushCallback metainfopushcallback,
+                  tTJSBinaryStream *src, tjs_int keyidx, tTVPGraphicLoadMode mode) { codecStub(); }
 void TVPLoadPVRv3(tTJSBinaryStream *, const std::function<void(const ttstr &, const tTJSVariant &)> &) {}
 
-bool TVPLoadHeaderPNG(void *, tTJSBinaryStream *, iTJSDispatch2 **) { return false; }
-bool TVPLoadHeaderWEBP(void *, tTJSBinaryStream *, iTJSDispatch2 **) { return false; }
-bool TVPLoadHeaderBPG(void *, tTJSBinaryStream *, iTJSDispatch2 **) { return false; }
-bool TVPLoadHeaderJXR(void *, tTJSBinaryStream *, iTJSDispatch2 **) { return false; }
-bool TVPLoadHeaderPVRv3(void *, tTJSBinaryStream *, iTJSDispatch2 **) { return false; }
+void TVPLoadHeaderPNG(void *, tTJSBinaryStream *, iTJSDispatch2 **) {}
+void TVPLoadHeaderWEBP(void *, tTJSBinaryStream *, iTJSDispatch2 **) {}
+void TVPLoadHeaderBPG(void *, tTJSBinaryStream *, iTJSDispatch2 **) {}
+void TVPLoadHeaderJXR(void *, tTJSBinaryStream *, iTJSDispatch2 **) {}
+void TVPLoadHeaderPVRv3(void *, tTJSBinaryStream *, iTJSDispatch2 **) {}
 
-bool TVPSaveAsPNG(void *, tTJSBinaryStream *, const iTVPBaseBitmap *, const ttstr &, iTJSDispatch2 *) { return false; }
-bool TVPSaveAsJXR(void *, tTJSBinaryStream *, const iTVPBaseBitmap *, const ttstr &, iTJSDispatch2 *) { return false; }
+void TVPSaveAsPNG(void *, tTJSBinaryStream *, const iTVPBaseBitmap *, const ttstr &, iTJSDispatch2 *) {}
+void TVPSaveAsJXR(void *, tTJSBinaryStream *, const iTVPBaseBitmap *, const ttstr &, iTJSDispatch2 *) {}
 bool TVPAcceptSaveAsPNG(void *, const ttstr &, iTJSDispatch2 **) { return false; }
 bool TVPAcceptSaveAsJXR(void *, const ttstr &, iTJSDispatch2 **) { return false; }
 
