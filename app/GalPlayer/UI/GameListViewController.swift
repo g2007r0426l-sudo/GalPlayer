@@ -53,6 +53,23 @@ final class GameListViewController: UIViewController {
         showFirstRunGuideIfNeeded()
     }
 
+    private var didAutoImport = false
+
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        guard !didAutoImport else { return }
+        didAutoImport = true
+        // 启动时自动收编「文件」App 里投放的文件夹 / zip
+        GameImporter.shared.importFromInbox { [weak self] imported, note in
+            guard let self else { return }
+            if imported > 0 {
+                self.rescan(force: true)
+                NSLog("[GalPlayer] 启动自动导入 %d 个", imported)
+            }
+            if let note { NSLog("[GalPlayer] 导入提示: %@", note) }
+        }
+    }
+
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
         gradientLayer.frame = contentWrap.bounds

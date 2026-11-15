@@ -51,18 +51,49 @@ final class GameImporter: NSObject {
                     // 跳过 App 自己产生的目录
                     if url.lastPathComponent.hasPrefix(".") { continue }
                     let isDir = (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) ?? false
-                    if isDir {
-                        do { try self.copyFolder(url); imported += 1 }
-                        catch { notes.append("\(url.lastPathComponent)：\(error.localizedDescription)") }
-                    } else if url.pathExtension.lowercased() == "zip" {
-                        notes.append("\(url.lastPathComponent)：请解压成文件夹后再导入")
-                    }
+                    do { try self.importAny(url); imported += 1 }
+                    catch { notes.append("\(url.lastPathComponent)：\(error.localizedDescription)") }
+                    _ = isDir
                 }
             }
             DispatchQueue.main.async {
                 completion(imported, notes.isEmpty ? nil : notes.prefix(2).joined(separator: "\n"))
             }
         }
+    }
+
+
+    /// 统一导入：文件夹直接拷；zip 先解压（若压缩包内只有一层目录，则把该目录当游戏）
+    func importAny(_ src: URL) throws {
+        let fm = FileManager.default
+        var isDir: ObjCBool = false
+        guard fm.fileExists(atPath: src.path, isDirectory: &isDir) else { return }
+        if isDir.boolValue {
+            try copyFolder(src)
+            return
+        }
+        guard src.pathExtension.lowercased() == "zip" else {
+            throw NSError(domain: "GalPlayer", code: 1,
+                          userInfo: [NSLocalizedDescriptionKey: "只支持文件夹或 zip 压缩包"])
+        }
+        let stem = src.deletingPathExtension().lastPathComponent
+        let tmp = fm.temporaryDirectory.appendingPathComponent("gp_unzip_\(UUID().uuidString)")
+        defer { try? fm.removeItem(at: tmp) }
+        _ = try ZipReader.unzip(src, to: tmp)
+
+        let children = (try? fm.contentsOfDirectory(at: tmp, includingPropertiesForKeys: [.isDirectoryKey])) ?? []
+        try fm.createDirectory(atPath: GameImporter.gamesRoot, withIntermediateDirectories: true)
+        if children.count == 1,
+           let only = children.first,
+           (try? only.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true {
+            // 压缩包里就是一层游戏目录：直接用它的名字
+            let dest = uniqueDestination(for: only.lastPathComponent)
+            try fm.moveItem(at: only, to: dest)
+        } else {
+            let dest = uniqueDestination(for: stem)
+            try fm.moveItem(at: tmp, to: dest)
+        }
+        NSLog("[GalPlayer] zip 导入完成: %@", src.lastPathComponent)
     }
 
     // ---------------------------------------------------------------------
@@ -102,14 +133,9 @@ extension GameImporter: UIDocumentPickerDelegate {
                 defer { if scoped { url.stopAccessingSecurityScopedResource() } }
                 var isDir: ObjCBool = false
                 guard FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir) else { continue }
-                if isDir.boolValue {
-                    do { try self.copyFolder(url); imported += 1 }
-                    catch { notes.append("\(url.lastPathComponent)：\(error.localizedDescription)") }
-                } else if url.pathExtension.lowercased() == "zip" {
-                    notes.append("\(url.lastPathComponent)：请解压成文件夹后再导入")
-                } else {
-                    notes.append("\(url.lastPathComponent)：请选择游戏文件夹")
-                }
+                do { try self.importAny(url); imported += 1 }
+                catch { notes.append("\(url.lastPathComponent)：\(error.localizedDescription)") }
+                _ = isDir
             }
             DispatchQueue.main.async {
                 self.onFinished?(imported, notes.isEmpty ? nil : notes.prefix(2).joined(separator: "\n"))
