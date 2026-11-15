@@ -82,8 +82,8 @@ final class Scanner {
                cached.dirMtime == mtime {
                 result.append(cached)                 // 目录没变，用缓存
             } else {
-                let detected = detectEngine(in: url)
-                result.append(GameEntry(name: name, path: url.path, detected: detected, dirMtime: mtime))
+                let resolved = resolveGame(in: url)
+                result.append(GameEntry(name: name, path: resolved.path, detected: resolved.engine, dirMtime: mtime))
             }
         }
 
@@ -110,6 +110,26 @@ final class Scanner {
     // -------------------------------------------------------------------------
     // 引擎识别
     // -------------------------------------------------------------------------
+
+    /// 解析真实游戏目录：
+    ///   顶层能识别 -> 用它；否则向下找一层（很多下载包是 "游戏名/游戏名/nscript.dat"）
+    private func resolveGame(in dir: URL, depth: Int = 2) -> (path: String, engine: GameEngine) {
+        let e = detectEngine(in: dir)
+        if e != .unknown { return (dir.path, e) }
+        guard depth > 0 else { return (dir.path, .unknown) }
+
+        // 只有一个子目录时，继续往下探（多子目录视为合集，不猜）
+        let subs = ((try? fm.contentsOfDirectory(at: dir,
+                                                 includingPropertiesForKeys: [.isDirectoryKey],
+                                                 options: [.skipsHiddenFiles])) ?? [])
+            .filter { (try? $0.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true }
+        guard subs.count == 1, let only = subs.first else { return (dir.path, .unknown) }
+
+        let inner = resolveGame(in: only, depth: depth - 1)
+        if inner.engine != .unknown { return inner }
+        return (dir.path, .unknown)
+    }
+
     private func detectEngine(in dir: URL) -> GameEngine {
         guard let names = try? fm.contentsOfDirectory(atPath: dir.path) else { return .unknown }
         let lower = names.map { $0.lowercased() }
