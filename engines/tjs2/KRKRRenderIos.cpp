@@ -169,7 +169,7 @@ public:
         if (!bmp) return nullptr;
         return CreateTexture2D(bmp->GetBits(), bmp->GetPitch(),
                                bmp->GetWidth(), bmp->GetHeight(),
-                               TVPTextureFormat::RGBA8);
+                               TVPTextureFormat::RGBA);
     }
 
     iTVPTexture2D *CreateTexture2D(TJS::tTJSBinaryStream *) override {
@@ -178,7 +178,7 @@ public:
     }
 
     iTVPTexture2D *CreateTexture2D(unsigned int neww, unsigned int newh, iTVPTexture2D *tex) override {
-        auto *t = new CpuTexture((tjs_int)neww, (tjs_int)newh, TVPTextureFormat::RGBA8);
+        auto *t = new CpuTexture((tjs_int)neww, (tjs_int)newh, TVPTextureFormat::RGBA);
         if (tex) {
             int sw = (int)tex->GetWidth(), sh = (int)tex->GetHeight();
             for (unsigned int y = 0; y < newh; ++y) {
