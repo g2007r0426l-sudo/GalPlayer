@@ -199,8 +199,6 @@ targets:
           - "-lbz2"
           - "-lz"
           - "-framework"
-          - "OpenAL"
-          - "-framework"
           - "AudioToolbox"
           - "-framework"
           - "AVFoundation"
