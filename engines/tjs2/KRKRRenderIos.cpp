@@ -222,16 +222,16 @@ public:
 
         for (int y = 0; y < dh; ++y) {
             int dy = rctar.top + y;
-            if (dy < 0 || dy >= dst->Height) continue;
+            if (dy < 0 || dy >= (int)dst->GetHeight()) continue;
             int sy = rs.top + (int)((int64_t)y * sh / dh);
-            if (sy < 0 || sy >= src->Height) continue;
-            const uint32_t *srow = src->pix.data() + (size_t)sy * (size_t)src->Width;
-            uint32_t *drow = dst->pix.data() + (size_t)dy * (size_t)dst->Width;
+            if (sy < 0 || sy >= (int)src->GetHeight()) continue;
+            const uint32_t *srow = src->pix.data() + (size_t)sy * (size_t)(int)src->GetWidth();
+            uint32_t *drow = dst->pix.data() + (size_t)dy * (size_t)(int)dst->GetWidth();
             for (int x = 0; x < dw; ++x) {
                 int dx = rctar.left + x;
-                if (dx < 0 || dx >= dst->Width) continue;
+                if (dx < 0 || dx >= (int)dst->GetWidth()) continue;
                 int sx = rs.left + (int)((int64_t)x * sw / dw);
-                if (sx < 0 || sx >= src->Width) continue;
+                if (sx < 0 || sx >= (int)src->GetWidth()) continue;
                 uint32_t s = srow[sx];
                 unsigned sa = ((s >> 24) & 0xFF) * (unsigned)opa / 255u;
                 if (sa == 0) continue;
@@ -257,8 +257,8 @@ public:
         if (!t) return;
         tTVPRect rc = rcclip;
         if (rc.get_width() <= 0 || rc.get_height() <= 0) {
-            rc.set_width(t->Width);
-            rc.set_height(t->Height);
+            rc.set_width((int)t->GetWidth());
+            rc.set_height((int)t->GetHeight());
         }
         tRenderTextureArray<tTVPRect> single(const_cast<std::pair<iTVPTexture2D *, tTVPRect> *>(&textures[0]), 1);
         OperateRect(method, target, reftar, rc, single);
@@ -274,8 +274,8 @@ public:
         if (!t) return;
         tTVPRect rc = rcclip;
         if (rc.get_width() <= 0 || rc.get_height() <= 0) {
-            rc.set_width(t->Width);
-            rc.set_height(t->Height);
+            rc.set_width((int)t->GetWidth());
+            rc.set_height((int)t->GetHeight());
         }
         tRenderTextureArray<tTVPRect> single(const_cast<std::pair<iTVPTexture2D *, tTVPRect> *>(&textures[0]), 1);
         OperateRect(method, target, reftar, rc, single);
