@@ -36,17 +36,19 @@ final class GameSession {
     func start(entry: GameEntry, completion: @escaping (Result<Void, SessionError>) -> Void) {
         let engine = EngineRegistry.shared.effectiveEngine(for: entry)
 
-        // Artemis 引擎：本机我们跑不了，但可以把游戏交给 Artroid+（Artemis 官方 iOS 播放器）
-        if engine == .artemis {
-            guard ArtroidHandoff.isInstalled() else {
-                completion(.failure(SessionError("这是 Artemis 引擎游戏（root.pfs）。\n本机需要安装 Artroid+ 才能玩，装好后我再帮你交接。")))
+        // 本机 GPU 只给正规安装的 App，我们跑不了 KRKR/Artemis
+        // -> 交给已安装的专用播放器（咔咔喵 / Artroid+）
+        if engine == .kirikiri || engine == .artemis {
+            let player: ExternalPlayer = (engine == .kirikiri) ? .krkrCat : .artroid
+            guard player.isInstalled else {
+                completion(.failure(SessionError("这是 \(engine.displayName) 引擎游戏，需要「\(player.displayName)」才能跑。\n本机没检测到它，请先安装。")))
                 return
             }
             do {
-                try ArtroidHandoff.handOff(gamePath: entry.path, gameName: entry.name)
+                try player.handOff(gamePath: entry.path, gameName: entry.name)
                 completion(.success(()))
             } catch {
-                completion(.failure(SessionError("交给 Artroid+ 失败：\(error.localizedDescription)")))
+                completion(.failure(SessionError("交给「\(player.displayName)」失败：\(error.localizedDescription)")))
             }
             return
         }
