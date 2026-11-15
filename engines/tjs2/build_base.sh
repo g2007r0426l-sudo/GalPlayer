@@ -23,7 +23,7 @@ ARCH="-target arm64-apple-ios14.0 -isysroot $SDK -miphoneos-version-min=14.0"
 
 INC="-I$CORE -I$CORE/tjs2 -I$CORE/base -I$CORE/base/win32"
 INC="$INC -I$CORE/msg -I$CORE/msg/win32 -I$CORE/utils -I$CORE/utils/win32 -I$CORE/utils/encoding"
-INC="$INC -I$CORE/environ -I$CORE/environ/win32 -I$CORE/environ/linux"
+INC="$INC -I$CORE/environ -I$CORE/environ/win32 -I$CORE/environ/linux -I$CORE/environ/ConfigManager"
 INC="$INC -I$CORE/visual -I$CORE/visual/win32 -I$CORE/extension -I$CORE/movie"
 INC="$INC -I$CORE/sound -I$CORE/sound/win32 -I$CORE/../plugins"
 INC="$INC -I$KX/platform/linux/compat -I$ROOT_DIR/engines/tjs2/iosinc"
@@ -79,7 +79,7 @@ compile_one() {
 }
 
 for d in base base/win32 msg msg/win32 utils utils/win32 utils/encoding extension \
-         visual visual/gl movie sound sound/win32 environ/ConfigManager; do
+         visual visual/gl movie sound sound/win32; do
     dir="$CORE/$d"
     [ -d "$dir" ] || continue
     for f in "$dir"/*.cpp "$dir"/*.c; do
