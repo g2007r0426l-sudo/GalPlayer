@@ -36,6 +36,14 @@ if [ -d "$KX/third_party" ]; then
     INC="$INC -I$KX/third_party"
 fi
 
+# 自动发现第三方头（由 SDL2 构建阶段拉取的 freetype / libpng / jpeg / webp 等）
+for h in ft2build.h png.h turbojpeg.h decode.h SDL.h; do
+    d=$(find "$ROOT_DIR/engines/SDL2" "$BUILD_ROOT/include" -name "$h" -print -quit 2>/dev/null)
+    if [ -n "$d" ]; then
+        INC="$INC -I$(dirname "$d")"
+    fi
+done
+
 FLAGS="-std=c++14 -O2 $ARCH -fexceptions -frtti -w -DTJS_TEXT_OUT_CRLF -D__STDC_CONSTANT_MACROS -D_7ZIP_ST -DLINUX -DKR2_IOS"
 
 SKIP_LIST=" base/win32/FuncStubs.cpp base/7zArchive.cpp base/UtilStreams.cpp base/ZIPArchive.cpp base/win32/StorageImpl.cpp base/win32/SusieArchive.cpp msg/win32/MsgLoad.cpp msg/win32/ReadOptionDesc.cpp "
