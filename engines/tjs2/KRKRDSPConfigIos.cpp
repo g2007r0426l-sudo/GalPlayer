@@ -50,15 +50,13 @@ void tRisaPhaseVocoderDSP::Process() {}
 // ---------------------------------------------------------------------------
 // IndividualConfigManager —— 内存版
 // ---------------------------------------------------------------------------
-IndividualConfigManager::IndividualConfigManager() { Initialize(); }
-
 void IndividualConfigManager::Clear() { AllConfig.clear(); ConfigUpdated = false; }
 
 std::string IndividualConfigManager::GetFilePath() { return CurrentPath; }
 
 IndividualConfigManager *IndividualConfigManager::GetInstance() {
-    static IndividualConfigManager *inst = new IndividualConfigManager();
-    return inst;
+    static IndividualConfigManager inst;   // 隐式默认构造
+    return &inst;
 }
 
 bool IndividualConfigManager::CheckExistAt(const std::string &folder) { (void)folder; return false; }
