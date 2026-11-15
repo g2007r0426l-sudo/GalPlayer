@@ -20,6 +20,11 @@
 #include "tjsUtils.h"
 #include "StorageIntf.h"
 #include "GraphicsLoaderIntf.h"
+#include "StorageImpl.h"     // IStream 类型 + TVPCreateIStream 声明
+
+// 声明在 StorageImpl.h（TJS_EXP_FUNC_DEF = extern）；iOS 无 MF 视频栈，返回空
+IStream * TVPCreateIStream(const ttstr &name, tjs_uint32 flags) { (void)name; (void)flags; return nullptr; }
+IStream * TVPCreateIStream(tTJSBinaryStream *stream) { (void)stream; return nullptr; }
 #include "UtilStreams.h"
 
 // iTVPRenderManager 在 RenderManager.h 里；先前置声明 cocos2d::Texture2D（接口仅作指针用）
@@ -42,7 +47,6 @@ tTVPWaveDecoder *FFWaveDecoderCreator::Create(const ttstr &, const ttstr &) { re
 // ---------------------------------------------------------------------------
 class tTJSNI_VideoOverlay;
 class iTVPVideoOverlay;
-#include "StorageImpl.h"   // 真正的 IStream 类型与 TVPCreateIStream 声明在这里
 
 bool GetVideoOverlayObject(tTJSNI_VideoOverlay *, IStream *, const char16_t *, const char16_t *,
                            unsigned long long, iTVPVideoOverlay **) { return false; }
@@ -124,7 +128,81 @@ void TVPShowPopMenu(tTJSNI_MenuItem *) {}
 // ---------------------------------------------------------------------------
 // 内存流 / 临时存储
 // ---------------------------------------------------------------------------
-tTVPMemoryStream::tTVPMemoryStream() {}
+// ---- tTVPMemoryStream：声明在 UtilStreams.h，实现在被跳过的 UtilStreams.cpp ----
+// 这里给完整实现（真可用的内存流），vtable 由此 TU 发出
+void tTVPMemoryStream::Init() {
+    Block = nullptr; Reference = false;
+    Size = 0; AllocSize = 0; CurrentPos = 0;
+}
+
+tTVPMemoryStream::tTVPMemoryStream() { Init(); }
+
+tTVPMemoryStream::tTVPMemoryStream(const void *block, tjs_uint size) {
+    Init();
+    if (size) {
+        Block = Alloc(size);
+        memcpy(Block, block, size);
+        Size = size; AllocSize = size;
+    }
+}
+
+tTVPMemoryStream::~tTVPMemoryStream() {
+    if (Block && !Reference) Free(Block);
+}
+
+void *tTVPMemoryStream::Alloc(size_t size) { return malloc(size); }
+void *tTVPMemoryStream::Realloc(void *org, size_t size) { return realloc(org, size); }
+void tTVPMemoryStream::Free(void *block) { free(block); }
+
+tjs_uint64 TJS_INTF_METHOD tTVPMemoryStream::Seek(tjs_int64 offset, tjs_int whence) {
+    switch (whence) {
+    case 0: CurrentPos = (tjs_uint)offset; break;                          // soFromSet
+    case 1: CurrentPos = (tjs_uint)(CurrentPos + offset); break;           // soFromCurrent
+    case 2: CurrentPos = (tjs_uint)(Size + offset); break;                 // soFromEnd
+    }
+    return CurrentPos;
+}
+
+tjs_uint TJS_INTF_METHOD tTVPMemoryStream::Read(void *buffer, tjs_uint read_size) {
+    if (!Block || CurrentPos >= Size) return 0;
+    if (CurrentPos + read_size > Size) read_size = Size - CurrentPos;
+    memcpy(buffer, (uint8_t *)Block + CurrentPos, read_size);
+    CurrentPos += read_size;
+    return read_size;
+}
+
+tjs_uint TJS_INTF_METHOD tTVPMemoryStream::Write(const void *buffer, tjs_uint write_size) {
+    if (!write_size) return 0;
+    if (CurrentPos + write_size > AllocSize) {
+        tjs_uint newsize = CurrentPos + write_size;
+        if (newsize < AllocSize * 2) newsize = AllocSize * 2;
+        void *nb = Realloc(Reference ? nullptr : Block, newsize);
+        if (!nb) return 0;
+        Block = nb; AllocSize = newsize; Reference = false;
+    }
+    memcpy((uint8_t *)Block + CurrentPos, buffer, write_size);
+    CurrentPos += write_size;
+    if (CurrentPos > Size) Size = CurrentPos;
+    return write_size;
+}
+
+void TJS_INTF_METHOD tTVPMemoryStream::SetEndOfStorage() { Size = CurrentPos; }
+
+void tTVPMemoryStream::Clear(void) {
+    if (Block && !Reference) Free(Block);
+    Init();
+}
+
+void tTVPMemoryStream::SetSize(tjs_uint size) {
+    if (!size) { if (Block && !Reference) Free(Block); Init(); return; }
+    void *nb = Realloc(Reference ? nullptr : Block, size);
+    if (!nb) return;
+    Block = nb; AllocSize = size;
+    if (Size > size) Size = size;
+    if (CurrentPos > size) CurrentPos = size;
+    Reference = false;
+}
+
 
 tTVPLocalTempStorageHolder::~tTVPLocalTempStorageHolder() {}
 
