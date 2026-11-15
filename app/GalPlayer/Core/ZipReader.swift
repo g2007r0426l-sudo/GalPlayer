@@ -36,8 +36,11 @@ enum ZipReader {
         try fm.createDirectory(at: destDir, withIntermediateDirectories: true)
 
         var count = 0
-        for e in entries where !e.name.hasSuffix("/") {
-            let full = destDir.appendingPathComponent(e.name)
+        for e in entries {
+            // Windows 打的 zip 可能用反斜杠分隔，统一成 /
+            let safeName = e.name.replacingOccurrences(of: "\\", with: "/")
+            if safeName.hasSuffix("/") { continue }
+            let full = destDir.appendingPathComponent(safeName)
             // 防目录穿越
             guard full.standardizedFileURL.path.hasPrefix(destDir.standardizedFileURL.path) else { continue }
             try fm.createDirectory(at: full.deletingLastPathComponent(),
