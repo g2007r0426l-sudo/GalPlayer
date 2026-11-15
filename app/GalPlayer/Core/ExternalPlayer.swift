@@ -24,6 +24,15 @@ struct ExternalPlayer {
     static let artroid = ExternalPlayer(bundleID: "com.artemis.artroid",
                                         subDir: "ARTEMIS",
                                         displayName: "Artroid+")
+    // 免费开源的 Kirikiroid2（zeas2 官方 IPA + ldid 重签），KRKR 首选目标
+    static let kirikiroid2 = ExternalPlayer(bundleID: "tvp.XP3Player.free",
+                                            subDir: "",
+                                            displayName: "Kirikiroid2")
+
+    /// KRKR 游戏的交接目标：Kirikiroid2 优先，咔咔喵后备
+    static func krkrTarget() -> ExternalPlayer {
+        return kirikiroid2.isInstalled ? kirikiroid2 : krkrCat
+    }
 
     private static let containersRoot = "/var/mobile/Containers/Data/Application"
 

@@ -110,7 +110,7 @@ final class GameCell: UICollectionViewCell {
 
         // Kirikiri 在本机不可用（GPU 受限）：列表里直接标灰并说明，避免点开才报错
         let playable = engine == .onscripter
-            || (engine == .kirikiri && ExternalPlayer.krkrCat.isInstalled)
+            || (engine == .kirikiri && ExternalPlayer.krkrTarget().isInstalled)
             || (engine == .artemis && ExternalPlayer.artroid.isInstalled)
         coverView.isDimmed = !playable
         nameLabel.text = entry.name
@@ -119,8 +119,8 @@ final class GameCell: UICollectionViewCell {
             metaLabel.text = ExternalPlayer.artroid.isInstalled
                 ? "点卡片 → 交给 Artroid+ 播放" : "需要安装 Artroid+"
         } else if engine == .kirikiri {
-            metaLabel.text = ExternalPlayer.krkrCat.isInstalled
-                ? "点卡片 → 交给咔咔喵播放" : "需要安装咔咔喵"
+            metaLabel.text = ExternalPlayer.krkrTarget().isInstalled
+                ? "点卡片 → 交给 Kirikiroid2 播放" : "需要安装 Kirikiroid2"
         } else {
             metaLabel.text = playable
                 ? "本地游戏 · \(TimeAgo.string(from: entry.dirMtime))"

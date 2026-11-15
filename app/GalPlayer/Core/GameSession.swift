@@ -39,7 +39,7 @@ final class GameSession {
         // 本机 GPU 只给正规安装的 App，我们跑不了 KRKR/Artemis
         // -> 交给已安装的专用播放器（咔咔喵 / Artroid+）
         if engine == .kirikiri || engine == .artemis {
-            let player: ExternalPlayer = (engine == .kirikiri) ? .krkrCat : .artroid
+            let player: ExternalPlayer = (engine == .kirikiri) ? ExternalPlayer.krkrTarget() : .artroid
             guard player.isInstalled else {
                 completion(.failure(SessionError("这是 \(engine.displayName) 引擎游戏，需要「\(player.displayName)」才能跑。\n本机没检测到它，请先安装。")))
                 return

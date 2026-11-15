@@ -560,7 +560,7 @@ final class GameListViewController: UIViewController {
         // KRKR / Artemis：本机 App 内还没有对应引擎（GPU 不可用，必须 CPU 渲染）
         // 不强制跳转，交给用户决定
         if engine == .kirikiri || engine == .artemis {
-            let player: ExternalPlayer = (engine == .kirikiri) ? .krkrCat : .artroid
+            let player: ExternalPlayer = (engine == .kirikiri) ? ExternalPlayer.krkrTarget() : .artroid
             let title = entry.name
             let msg = engine == .kirikiri
                 ? "本机 App 内暂未内置 Kirikiri2 引擎。\n可以先用「\(player.displayName)」打开这个游戏。"
