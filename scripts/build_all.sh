@@ -41,6 +41,13 @@ else
     echo "[build] WARNING: TJS2 构建失败（不阻塞出包）"
 fi
 
+echo "==== [4c/6] KiriKiri base 层（宿主类/归档/脚本接口） ===="
+if bash "$ROOT_DIR/engines/tjs2/build_base.sh"; then
+    echo "[build] base 层 OK"
+else
+    echo "[build] WARNING: base 层构建失败（不阻塞出包）"
+fi
+
 echo "==== [5/6] App ===="
 bash "$ROOT_DIR/scripts/build_app.sh"
 
