@@ -108,6 +108,7 @@ compile_one "$ROOT_DIR/engines/tjs2/KRKRAudioStubs.cpp" "ios/KRKRAudioStubs.cpp"
 compile_one "$ROOT_DIR/engines/tjs2/KRKRMiscIos.cpp" "ios/KRKRMiscIos.cpp"
 compile_one "$ROOT_DIR/engines/tjs2/KRKRCloseoutIos.cpp" "ios/KRKRCloseoutIos.cpp"
 compile_one "$ROOT_DIR/engines/tjs2/KRKRDSPConfigIos.cpp" "ios/KRKRDSPConfigIos.cpp"
+compile_one "$ROOT_DIR/engines/tjs2/KRKRPlatform2Ios.cpp" "ios/KRKRPlatform2Ios.cpp"
 
 # iOS 平台层实现
 compile_one "$ROOT_DIR/engines/tjs2/IOSPlatform.cpp" "ios/IOSPlatform.cpp"

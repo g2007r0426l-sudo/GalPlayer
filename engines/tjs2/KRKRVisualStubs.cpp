@@ -11,6 +11,7 @@
 #include <cstdio>
 #include <string>
 #include <functional>
+#include <tuple>
 #include <vector>
 
 #include "tjsCommHead.h"
@@ -71,7 +72,18 @@ public:
     void SetTitle(const ttstr &title);
     void Terminate();
     void PostUserMessage(const std::function<void()> &func, void *data, int delay);
+    void FilterUserMessage(const std::function<void(std::vector<std::tuple<void *, int, std::function<void()>>> &)> &filter);
+    void LoadImageRequest(TJS::iTJSDispatch2 *callback, class tTJSNI_Bitmap *bmp, const ttstr &name);
 };
+
+void tTVPApplication::FilterUserMessage(const std::function<void(std::vector<std::tuple<void *, int, std::function<void()>>> &)> &filter) {
+    (void)filter;   // 阶段一：不过滤，事件照常派发
+}
+
+void tTVPApplication::LoadImageRequest(TJS::iTJSDispatch2 *callback, class tTJSNI_Bitmap *, const ttstr &name) {
+    KRKR_STUB_LOG("LoadImageRequest(%s) 未实现（阶段二接 SDL2_image）", name.AsStdString().c_str());
+    (void)callback;
+}
 
 void tTVPApplication::SetTitle(const ttstr &title) {
     KRKR_STUB_LOG("SetTitle: %s", title.AsStdString().c_str());
