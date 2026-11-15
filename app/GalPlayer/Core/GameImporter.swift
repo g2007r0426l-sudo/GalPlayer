@@ -51,9 +51,12 @@ final class GameImporter: NSObject {
                     // 跳过 App 自己产生的目录
                     if url.lastPathComponent.hasPrefix(".") { continue }
                     let isDir = (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) ?? false
+                    // 跳过：游戏库自身、隐藏项、看起来不是游戏的目录
+                    if url.lastPathComponent == "Galgames" { continue }
+                    if isDir && !self.looksLikeGame(url) { continue }
+                    if !isDir && url.pathExtension.lowercased() != "zip" { continue }
                     do { try self.importAny(url); imported += 1 }
                     catch { notes.append("\(url.lastPathComponent)：\(error.localizedDescription)") }
-                    _ = isDir
                 }
             }
             DispatchQueue.main.async {
@@ -62,6 +65,19 @@ final class GameImporter: NSObject {
         }
     }
 
+
+
+    /// 判定目录是否像一个游戏（避免把系统目录 / Galgames 自身误导入）
+    func looksLikeGame(_ dir: URL) -> Bool {
+        let fm = FileManager.default
+        let names = (try? fm.contentsOfDirectory(atPath: dir.path))?.map { $0.lowercased() } ?? []
+        if names.contains("nscript.dat") || names.contains("0.txt")
+            || names.contains("00.txt") || names.contains("nscript.___")
+            || names.contains("root.pfs") {
+            return true
+        }
+        return names.contains { $0.hasSuffix(".xp3") }
+    }
 
     /// 统一导入：文件夹直接拷；zip 先解压（若压缩包内只有一层目录，则把该目录当游戏）
     func importAny(_ src: URL) throws {
