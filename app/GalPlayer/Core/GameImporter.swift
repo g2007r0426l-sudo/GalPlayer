@@ -56,7 +56,11 @@ final class GameImporter: NSObject {
                     if isDir && !self.looksLikeGame(url) { continue }
                     if !isDir && url.pathExtension.lowercased() != "zip" { continue }
                     do { try self.importAny(url); imported += 1 }
-                    catch { notes.append("\(url.lastPathComponent)：\(error.localizedDescription)") }
+                    catch {
+                        let msg = "\(url.lastPathComponent)：\(error.localizedDescription)"
+                        notes.append(msg)
+                        GameImporter.log("FAILED " + msg)
+                    }
                 }
             }
             DispatchQueue.main.async {
@@ -66,6 +70,21 @@ final class GameImporter: NSObject {
     }
 
 
+
+
+    static func log(_ msg: String) {
+        NSLog("[GalPlayer-import] %@", msg)
+        let line = ISO8601DateFormatter().string(from: Date()) + " " + msg + "\n"
+        let path = "/var/mobile/Documents/gp_import.log"
+        if let fh = FileHandle(forWritingAtPath: path) {
+            fh.seekToEndOfFile()
+            fh.write(line.data(using: .utf8) ?? Data())
+            try? fh.close()
+        } else {
+            try? line.write(toFile: path, atomically: true, encoding: .utf8)
+            try? FileManager.default.setAttributes([.posixPermissions: 0o666], ofItemAtPath: path)
+        }
+    }
 
     /// 判定目录是否像一个游戏（避免把系统目录 / Galgames 自身误导入）
     func looksLikeGame(_ dir: URL) -> Bool {
@@ -84,8 +103,10 @@ final class GameImporter: NSObject {
         let fm = FileManager.default
         var isDir: ObjCBool = false
         guard fm.fileExists(atPath: src.path, isDirectory: &isDir) else { return }
+        GameImporter.log("importAny start: \(src.lastPathComponent)")
         if isDir.boolValue {
             try copyFolder(src)
+            GameImporter.log("folder copied: \(src.lastPathComponent)")
             return
         }
         guard src.pathExtension.lowercased() == "zip" else {
@@ -95,7 +116,9 @@ final class GameImporter: NSObject {
         let stem = src.deletingPathExtension().lastPathComponent
         let tmp = fm.temporaryDirectory.appendingPathComponent("gp_unzip_\(UUID().uuidString)")
         defer { try? fm.removeItem(at: tmp) }
-        _ = try ZipReader.unzip(src, to: tmp)
+        GameImporter.log("unzip begin: \(src.lastPathComponent) size=\(((try? FileManager.default.attributesOfItem(atPath: src.path)[.size] as? Int) ?? 0))")
+        let n = try ZipReader.unzip(src, to: tmp)
+        GameImporter.log("unzip ok: \(n) entries")
 
         let children = (try? fm.contentsOfDirectory(at: tmp, includingPropertiesForKeys: [.isDirectoryKey])) ?? []
         try fm.createDirectory(atPath: GameImporter.gamesRoot, withIntermediateDirectories: true)
