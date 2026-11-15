@@ -54,8 +54,9 @@ compile_one() {
     local rc=0
     case "$src" in
         *.c)
-            # C 源码必须用 C 编译器，否则符号会被 C++ 改名（gbk_mbtowc 等）
-            clang $FLAGS $INC -c "$src" -o "$obj" 2> "$OBJ_DIR/$base.log" || rc=$?
+            # C 源码：C 编译器 + C 标准（不能带 -std=c++14），否则符号会被改名
+            clang -std=c11 -O2 $ARCH -w -D_7ZIP_ST -DLINUX -DKR2_IOS $INC \
+                  -c "$src" -o "$obj" 2> "$OBJ_DIR/$base.log" || rc=$?
             ;;
         *)
             clang++ $FLAGS $INC -c "$src" -o "$obj" 2> "$OBJ_DIR/$base.log" || rc=$?
