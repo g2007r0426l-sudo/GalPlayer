@@ -70,15 +70,6 @@ tTVPBitmap::~tTVPBitmap() {
     }
 }
 
-tjs_uint tTVPBitmap::GetBPP() const {
-    if (Width <= 0) return 32;
-    tjs_int bpp = PitchStep / Width * 8;
-    return (tjs_uint)(bpp > 0 ? bpp : 32);
-}
-
-bool tTVPBitmap::Is32bit() const { return GetBPP() == 32; }
-bool tTVPBitmap::Is8bit() const  { return GetBPP() == 8; }
-
 void *tTVPBitmap::GetScanLine(tjs_uint l) const {
     if (!Bits || l >= (tjs_uint)Height) return nullptr;
     return (void *)((uint8_t *)Bits + (size_t)PitchStep * l);
