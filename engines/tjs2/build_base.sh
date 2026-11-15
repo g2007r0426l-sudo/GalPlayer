@@ -46,7 +46,7 @@ done
 
 FLAGS="-std=c++14 -O2 $ARCH -fexceptions -frtti -w -DTJS_TEXT_OUT_CRLF -D__STDC_CONSTANT_MACROS -D_7ZIP_ST -DLINUX -DKR2_IOS"
 
-SKIP_LIST="  base/7zArchive.cpp  base/ZIPArchive.cpp base/win32/StorageImpl.cpp base/win32/SusieArchive.cpp msg/win32/MsgLoad.cpp msg/win32/ReadOptionDesc.cpp "
+SKIP_LIST=" base/win32/FuncStubs.cpp  base/7zArchive.cpp  base/ZIPArchive.cpp base/win32/StorageImpl.cpp base/win32/SusieArchive.cpp msg/win32/MsgLoad.cpp msg/win32/ReadOptionDesc.cpp "
 
 OK=0
 FAIL=0
