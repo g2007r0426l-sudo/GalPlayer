@@ -1,69 +1,90 @@
 #!/usr/bin/env bash
 # =============================================================================
-# KiriKiri base 层 -> iOS 静态库
+# KiriKiri 运行时 -> iOS 静态库（不含图形/音频）
 #
-# base/ 里是 KiriKiri 的运行时接口实现（Storages / System / Scripts / Plugins /
-# XP3Archive / PluginIntf / ScriptMgnIntf ...），图形实现才在 visual/（依赖 cocos）。
-# 所以先把 base 编通：脚本引擎 + 归档 + 宿主类能工作，画面后面自己用 CPU 画。
+# 编译范围：base(+win32) / msg(+win32) / utils(+win32) / environ(+win32+linux) / tjs2 宿主接口
+# 排除：visual（GL 渲染，后面用自研 CPU 渲染替代）、sound（音频）、movie（视频）
 #
 # 产物: build/ios/lib/libkrkrbase.a
+#   失败的单个文件会列出来，但不阻塞其它文件（便于逐步攻克）
 # =============================================================================
 set -uo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
 BUILD_ROOT="$ROOT_DIR/build/ios"
 CORE="$ROOT_DIR/engines/kirikiroid2/Kirikinux2/src/core"
-SRC="$CORE/base"
+KX="$ROOT_DIR/engines/kirikiroid2/Kirikinux2"
 OBJ_DIR="$BUILD_ROOT/obj/krkrbase"
 OUT="$BUILD_ROOT/lib/libkrkrbase.a"
 
 mkdir -p "$BUILD_ROOT/lib" "$OBJ_DIR"
-[ -d "$SRC" ] || { echo "[KRKRBASE] ERROR: 缺少 $SRC"; exit 1; }
-
-# TJS2 头与 onig 头
-TJS_INC="$CORE/tjs2"
-ONIG_INC="$ROOT_DIR/engines/kirikiroid2/third_party/oniguruma/src"
+[ -d "$CORE" ] || { echo "[KRKRBASE] ERROR: 缺少 $CORE"; exit 1; }
 
 SDK=$(xcrun --sdk iphoneos --show-sdk-path)
 ARCH="-target arm64-apple-ios14.0 -isysroot $SDK -miphoneos-version-min=14.0"
 
-INC=(-I"$SRC" -I"$TJS_INC" -I"$CORE/utils" -I"$CORE/base" -I"$CORE/environ" -I"$CORE"
-     -I"$CORE/msg" -I"$CORE/msg/win32" -I"$CORE/visual" -I"$CORE/visual/win32"
-     -I"$CORE/extension" -I"$CORE/movie" -I"$CORE/sound" -I"$CORE/sound/win32"
-     -I"$CORE/base/win32" -I"$CORE/utils/win32" -I"$CORE/environ/win32" -I"$CORE/../plugins"
-     -I"$ROOT_DIR/engines/kirikiroid2/Kirikinux2/platform/linux/compat")
+INC=(-I"$CORE" -I"$CORE/tjs2" -I"$CORE/base" -I"$CORE/base/win32" -I"$CORE/msg" -I"$CORE/msg/win32"
+     -I"$CORE/utils" -I"$CORE/utils/win32" -I"$CORE/utils/encoding"
+     -I"$CORE/environ" -I"$CORE/environ/win32" -I"$CORE/environ/linux"
+     -I"$CORE/visual" -I"$CORE/visual/win32" -I"$CORE/extension" -I"$CORE/movie"
+     -I"$CORE/sound" -I"$CORE/sound/win32" -I"$CORE/../plugins"
+     -I"$KX/platform/linux/compat")
+ONIG_INC="$ROOT_DIR/engines/kirikiroid2/third_party/oniguruma/src"
 [ -f "$ONIG_INC/oniguruma.h" ] && INC+=(-I"$ONIG_INC")
-# third_party 根（7zip C API: 7zip/C/7z.h）
-TP="$ROOT_DIR/engines/kirikiroid2/Kirikinux2/third_party"
+TP="$KX/third_party"
 [ -d "$TP" ] && INC+=(-I"$TP")
 
-CXXFLAGS=(-std=c++14 -O2 $ARCH -fexceptions -frtti
+CXXFLAGS=(-std=c++14 -O2 $ARCH -fexceptions -frtti -w
           -DTJS_TEXT_OUT_CRLF -D__STDC_CONSTANT_MACROS -D_7ZIP_ST
           -DLINUX -DKR2_IOS "${INC[@]}")
 
-FAILED=0
-COUNT=0
-for f in "$SRC"/*.cpp; do
-    base=$(basename "$f")
-    # XP3ArchiveRepack 依赖 7-Zip C++ 库，先跳过
-    case "$base" in
-        XP3ArchiveRepack.cpp) echo "[KRKRBASE] 跳过: $base"; continue;;
-    esac
-    obj="$OBJ_DIR/${base%.cpp}.o"
-    if ! clang++ "${CXXFLAGS[@]}" -c "$f" -o "$obj" 2> "$OBJ_DIR/${base}.log"; then
-        echo "[KRKRBASE] FAIL: $base"
-        grep -E "error:" "$OBJ_DIR/${base}.log" | head -4
-        FAILED=$((FAILED+1))
-        continue
-    fi
-    COUNT=$((COUNT+1))
-    echo "[KRKRBASE] CC $base"
+# 需要编译的目录（相对 CORE）
+DIRS=(
+  "base"
+  "base/win32"
+  "msg"
+  "msg/win32"
+  "utils"
+  "utils/win32"
+  "utils/encoding"
+  "environ"
+  "environ/win32"
+  "environ/linux"
+  "extension"
+)
+
+OK=0; FAIL=0
+FAILED_NAMES=""
+for d in "${DIRS[@]}"; do
+    dir="$CORE/$d"
+    [ -d "$dir" ] || continue
+    for f in "$dir"/*.cpp; do
+        [ -e "$f" ] || continue
+        base=$(basename "$f")
+        obj="$OBJ_DIR/${d//\//_}_${base%.cpp}.o"
+        if clang++ "${CXXFLAGS[@]}" -c "$f" -o "$obj" 2> "$OBJ_DIR/${base}.log"; then
+            OK=$((OK+1))
+        else
+            FAIL=$((FAIL+1))
+            FAILED_NAMES="$FAILED_NAMES $d/$base"
+        fi
+    done
 done
 
-if [ "$COUNT" -gt 0 ]; then
+echo "[KRKRBASE] 成功 $OK 个，失败 $FAIL 个"
+if [ "$FAIL" -gt 0 ]; then
+    for n in $FAILED_NAMES; do
+        base=$(basename "$n")
+        err=$(grep -m1 -E "fatal error:|error:" "$OBJ_DIR/${base}.log" 2>/dev/null | head -1)
+        echo "  FAIL $n :: ${err:-unknown}"
+    done
+fi
+
+if [ "$OK" -gt 0 ]; then
+    rm -f "$OUT"
     xcrun --sdk iphoneos ar rcs "$OUT" "$OBJ_DIR"/*.o 2>/dev/null
     xcrun --sdk iphoneos ranlib "$OUT" 2>/dev/null
-    echo "[KRKRBASE] OK -> $OUT ($(ls -lh "$OUT" | awk '{print $5}'), $COUNT 个文件, $FAILED 个失败)"
+    echo "[KRKRBASE] OK -> $OUT ($(ls -lh "$OUT" | awk '{print $5}'))"
 else
     echo "[KRKRBASE] ERROR: 没有文件编译成功"
     exit 1
