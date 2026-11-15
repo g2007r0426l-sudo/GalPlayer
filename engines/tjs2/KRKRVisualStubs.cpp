@@ -107,19 +107,3 @@ void TVPExitApplication(int code) {
 ttstr TVPGetErrorDialogTitle() {
     return ttstr("GalPlayer");
 }
-
-// 语言配置
-class LocaleConfigManager {
-public:
-    static LocaleConfigManager *GetInstance();
-    ttstr GetText(const std::string &key) const;
-};
-
-LocaleConfigManager *LocaleConfigManager::GetInstance() {
-    static LocaleConfigManager inst;
-    return &inst;
-}
-
-ttstr LocaleConfigManager::GetText(const std::string &key) const {
-    return ttstr(key.c_str());
-}
