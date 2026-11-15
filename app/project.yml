@@ -71,6 +71,15 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.yg.onsplayer
         INFOPLIST_FILE: "$(SRCROOT)/OnsPlayer-Info.plist"
+        HEADER_SEARCH_PATHS:
+          - "$(inherited)"
+          - "$(SRCROOT)/../build/ios/include/SDL2"
+          - "$(SRCROOT)/../build/ios/include"
+          - "$(SRCROOT)/../engines/kirikiroid2/Kirikinux2/src/core/tjs2"
+          - "$(SRCROOT)/../engines/kirikiroid2/Kirikinux2/src/core/utils"
+          - "$(SRCROOT)/../engines/kirikiroid2/Kirikinux2/src/core/base"
+          - "$(SRCROOT)/../engines/kirikiroid2/Kirikinux2/src/core/environ"
+          - "$(SRCROOT)/../engines/kirikiroid2/third_party/oniguruma/src"
         TARGETED_DEVICE_FAMILY: "2"
         OTHER_CPLUSPLUSFLAGS:
           - "-std=c++14"
