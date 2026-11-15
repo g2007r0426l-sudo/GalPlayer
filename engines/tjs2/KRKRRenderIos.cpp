@@ -313,3 +313,13 @@ void TVPRegisterRenderManager(const char *, iTVPRenderManager *(*func)()) {
 iTVPRenderMethod *iTVPRenderManager::GetRenderMethod(tjs_int opa, bool hda, int method) {
     return new CpuRenderMethod((int)opa, hda, method);
 }
+
+// 上游定义在 RenderManager.cpp；这里给 CPU 版
+void iTVPTexture2D::Release() {
+    if (--RefCount <= 0) delete this;
+}
+
+iTVPRenderMethod *iTVPRenderManager::GetRenderMethod(const char *name, uint32_t *hint) {
+    (void)name; (void)hint;
+    return new CpuRenderMethod(255, false, 0);
+}
