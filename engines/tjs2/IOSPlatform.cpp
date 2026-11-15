@@ -14,6 +14,8 @@
 #include <unistd.h>
 #include <dirent.h>
 #include <ctime>
+#include <mach-o/dyld.h>
+#include <limits.h>
 
 #include "tjsCommHead.h"
 #include "tjsString.h"
@@ -124,4 +126,18 @@ tjs_uint32 TVPGetRoughTickCount32() {
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
     return (tjs_uint32)(ts.tv_sec * 1000ull + ts.tv_nsec / 1000000ull);
+}
+
+
+// ---------------------------------------------------------------- 控制台输出
+// 运行时里由 tTVPApplication 提供；我们只做最小实现（写 stderr），
+// 用最小类声明匹配符号名，不引入 Application.h（它依赖 Win32 图形栈）。
+class tTVPApplication {
+public:
+    static void PrintConsole(const ttstr &mes, bool important = false);
+};
+
+void tTVPApplication::PrintConsole(const ttstr &mes, bool important) {
+    (void)important;
+    GP_KRKR_LOG("console: %s", mes.AsStdString().c_str());
 }

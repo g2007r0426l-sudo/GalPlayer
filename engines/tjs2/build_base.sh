@@ -51,7 +51,17 @@ compile_one() {
     local base
     base=$(basename "$src")
     local obj="$OBJ_DIR/$(echo "$tag" | tr '/' '_').o"
-    if clang++ $FLAGS $INC -c "$src" -o "$obj" 2> "$OBJ_DIR/$base.log"; then
+    local rc=0
+    case "$src" in
+        *.c)
+            # C 源码必须用 C 编译器，否则符号会被 C++ 改名（gbk_mbtowc 等）
+            clang $FLAGS $INC -c "$src" -o "$obj" 2> "$OBJ_DIR/$base.log" || rc=$?
+            ;;
+        *)
+            clang++ $FLAGS $INC -c "$src" -o "$obj" 2> "$OBJ_DIR/$base.log" || rc=$?
+            ;;
+    esac
+    if [ "$rc" -eq 0 ]; then
         OK=$((OK + 1))
     else
         FAIL=$((FAIL + 1))
