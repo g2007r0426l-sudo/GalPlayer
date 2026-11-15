@@ -20,6 +20,7 @@
 #include "tjsUtils.h"
 #include "StorageIntf.h"
 #include "GraphicsLoaderIntf.h"
+#include "UtilStreams.h"
 
 // iTVPRenderManager 在 RenderManager.h 里；先前置声明 cocos2d::Texture2D（接口仅作指针用）
 namespace cocos2d { class Texture2D; }
@@ -123,16 +124,8 @@ void TVPShowPopMenu(tTJSNI_MenuItem *) {}
 // ---------------------------------------------------------------------------
 // 内存流 / 临时存储
 // ---------------------------------------------------------------------------
-class tTVPMemoryStream {
-public:
-    tTVPMemoryStream();
-};
 tTVPMemoryStream::tTVPMemoryStream() {}
 
-class tTVPLocalTempStorageHolder {
-public:
-    ~tTVPLocalTempStorageHolder();
-};
 tTVPLocalTempStorageHolder::~tTVPLocalTempStorageHolder() {}
 
 // ---------------------------------------------------------------------------
