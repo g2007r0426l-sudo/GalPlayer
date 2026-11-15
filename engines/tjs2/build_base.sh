@@ -104,6 +104,7 @@ fi
 
 # iOS 软件渲染管理器（CPU 纹理 + 合成）
 compile_one "$ROOT_DIR/engines/tjs2/KRKRRenderIos.cpp" "ios/KRKRRenderIos.cpp"
+compile_one "$ROOT_DIR/engines/tjs2/KRKRAudioStubs.cpp" "ios/KRKRAudioStubs.cpp"
 
 # iOS 平台层实现
 compile_one "$ROOT_DIR/engines/tjs2/IOSPlatform.cpp" "ios/IOSPlatform.cpp"
