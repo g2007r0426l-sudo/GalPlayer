@@ -194,7 +194,7 @@ enum XP3 {
 }
 
 // MARK: - 小端读取
-extension Data {
+fileprivate extension Data {
     func u16(_ off: Int) -> UInt16 {
         guard off + 2 <= count else { return 0 }
         return withUnsafeBytes { $0.loadUnaligned(fromByteOffset: off, as: UInt16.self) }
