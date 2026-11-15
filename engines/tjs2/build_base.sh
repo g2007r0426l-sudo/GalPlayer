@@ -70,7 +70,8 @@ compile_one() {
     fi
 }
 
-for d in base base/win32 msg msg/win32 utils utils/win32 utils/encoding extension; do
+for d in base base/win32 msg msg/win32 utils utils/win32 utils/encoding extension \
+         visual visual/gl movie sound sound/win32; do
     dir="$CORE/$d"
     [ -d "$dir" ] || continue
     for f in "$dir"/*.cpp "$dir"/*.c; do
