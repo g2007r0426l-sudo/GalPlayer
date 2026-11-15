@@ -1,4 +1,5 @@
 import UIKit
+import Metal
 
 // =============================================================================
 // AppDelegate — 纯代码构建（禁用 storyboard/XIB：旧系统 + 新 SDK storyboard 会启动即崩）
@@ -38,8 +39,24 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
         return true
     }
 
+
+    /// GPU 可用性探针（判断本机是否全局禁用 Metal）
+    private func probeGPU() {
+        let dev = MTLCreateSystemDefaultDevice()
+        let msg = "MTLDevice=\(dev?.name ?? "nil")\n"
+        let path = "/var/mobile/Documents/gp_gpu.log"
+        if let fh = FileHandle(forWritingAtPath: path) {
+            fh.seekToEndOfFile(); fh.write(msg.data(using: .utf8) ?? Data()); try? fh.close()
+        } else {
+            try? msg.write(toFile: path, atomically: true, encoding: .utf8)
+            try? FileManager.default.setAttributes([.posixPermissions: 0o666], ofItemAtPath: path)
+        }
+        NSLog("[GalPlayer] %@", msg)
+    }
+
     func restoreMainWindow() {
         window?.makeKeyAndVisible()
+        probeGPU()
         window?.bringSubviewToFront(window?.rootViewController?.view ?? UIView())
     }
 
