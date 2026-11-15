@@ -15,6 +15,7 @@
 #include "tjsVariant.h"
 #include "tjsString.h"
 #include "tjsUtils.h"
+#include "ScriptMgnIntf.h"
 
 extern "C" int  gp_xp3_read_file(const char *xp3Path, const char *entryName,
                                  unsigned char **outBuf, size_t *outLen);
@@ -74,9 +75,12 @@ extern "C" void gp_tjs2_probe(const char *xp3Path) {
         logf("[warn] TVPInitializeBaseSystems threw\n");
     }
     try {
-        engine = new tTJS();
+        // 官方入口：创建脚本引擎并注册全部原生类
+        // (Debug/Font/Layer/System/Storages/Plugins/Scripts/Bitmap ...)
+        TVPInitScriptEngine();
+        engine = TVPGetScriptEngine();
         engine->SetConsoleOutput(&console);
-        logf("[ok] engine created\n");
+        logf("[ok] TVPInitScriptEngine done engine=%p\n", (void*)engine);
 
         tTJSVariant result;
         engine->ExecScript(TJS_W("var a = 6 * 7; var s = 'gal' + 'player'; var arr = [1,2,3]; a + arr[2];"),
@@ -106,9 +110,7 @@ extern "C" void gp_tjs2_probe(const char *xp3Path) {
             }
         }
 
-        engine->Shutdown();
-        engine->Release();
-        engine = nullptr;
+        // 引擎归运行时管理，这里不 Shutdown/Release
         logf("=== TJS2 probe done ===\n");
     } catch (eTJS &e) {
         logf("[fatal] eTJS: %s\n", toStd(e.GetMessage().c_str()).c_str());
