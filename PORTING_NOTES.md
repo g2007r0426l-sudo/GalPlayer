@@ -62,6 +62,21 @@ CALayer.contents  ← 系统合成器直接上屏，全程不需要 GPU 客户�
   - 双指轻点 = 右键（呼出菜单）
   - 长按 ≥450ms = 按住 Ctrl + 连点（快进）
 
+
+### 2.1 GPU 权限的最终结论（两处独立探针）
+
+| 探针位置 | 时机 | 结果 |
+|---|---|---|
+| OnsPlayer（SDL 启动早期，UIApplicationMain 之前） | 引擎入口 | `MTLDevice=nil` |
+| GalPlayer（纯 UIKit App，`didFinishLaunching` 末尾） | App 启动 | `MTLDevice=nil` |
+
+两处都拿不到 Metal 设备，且加 `platform-application` 等 entitlements 后依旧为 nil
+→ **这是该越狱环境对侧载 App 的全局 GPU 限制**，不是 SDL 初始化时机问题。
+
+因此：
+- 任何依赖 GL/Metal 的渲染方案（cocos2d-x/Kirikiroid2、SDL 的 metal/opengles 后端）在本机不可用
+- 唯一可行路径是「CPU 渲染 + `CALayer.contents` 交给系统合成器」——ONScripter 正是这么做的
+
 ---
 
 ## 三、ONScripter 接入细节
