@@ -54,6 +54,7 @@ if [ ! -f "$BUILD_ROOT/lib/libonig.a" ]; then
         [ -n "$lib" ] && cp -f "$lib" "$BUILD_ROOT/lib/libonig.a" && echo "[TJS2] oniguruma OK"
     fi
 fi
+CORE_SRC="$ROOT_DIR/engines/kirikiroid2/Kirikinux2/src/core"
 ONIG_INC=""
 [ -f "$ONIG_ROOT/src/oniguruma.h" ] && ONIG_INC="$ONIG_ROOT/src"
 
@@ -63,7 +64,7 @@ ARCH="-target arm64-apple-ios14.0 -isysroot $SDK -miphoneos-version-min=14.0"
 
 CXXFLAGS=(-std=c++14 -O2 $ARCH \
           -DTJS_TEXT_OUT_CRLF -D__STDC_CONSTANT_MACROS \
-          -I"$SRC_ROOT" ${ONIG_INC:+-I"$ONIG_INC"})
+          -I"$SRC_ROOT" -I"$CORE_SRC/utils" -I"$CORE_SRC/base" -I"$CORE_SRC/environ" ${ONIG_INC:+-I"$ONIG_INC"})
 
 # 排除需要宿主/图形环境的文件（保持 VM 纯净）
 SKIP_RE='tjsDate\.cpp|tjsRandomGenerator\.cpp'
