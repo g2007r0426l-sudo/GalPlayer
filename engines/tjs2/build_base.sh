@@ -30,7 +30,7 @@ ARCH="-target arm64-apple-ios14.0 -isysroot $SDK -miphoneos-version-min=14.0"
 INC=(-I"$SRC" -I"$TJS_INC" -I"$CORE/utils" -I"$CORE/base" -I"$CORE/environ" -I"$CORE"
      -I"$CORE/msg" -I"$CORE/msg/win32" -I"$CORE/visual" -I"$CORE/visual/win32"
      -I"$CORE/extension" -I"$CORE/movie" -I"$CORE/sound" -I"$CORE/sound/win32"
-     -I"$CORE/base/win32" -I"$CORE/utils/win32" -I"$CORE/../plugins"
+     -I"$CORE/base/win32" -I"$CORE/utils/win32" -I"$CORE/environ/win32" -I"$CORE/../plugins"
      -I"$ROOT_DIR/engines/kirikiroid2/Kirikinux2/platform/linux/compat")
 [ -f "$ONIG_INC/oniguruma.h" ] && INC+=(-I"$ONIG_INC")
 # third_party 根（7zip C API: 7zip/C/7z.h）
