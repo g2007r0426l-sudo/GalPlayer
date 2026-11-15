@@ -34,6 +34,13 @@ else
     echo "[build] WARNING: KRKR 引擎构建失败 —— 本次 .deb 仅含主 App（ONS），KRKR 相关功能不可用"
 fi
 
+echo "==== [4b/6] TJS2 脚本引擎（KRKR 移植地基） ===="
+if bash "$ROOT_DIR/engines/tjs2/build_ios.sh"; then
+    echo "[build] TJS2 构建成功"
+else
+    echo "[build] WARNING: TJS2 构建失败（不阻塞出包）"
+fi
+
 echo "==== [5/6] App ===="
 bash "$ROOT_DIR/scripts/build_app.sh"
 
