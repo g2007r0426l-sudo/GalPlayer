@@ -20,6 +20,9 @@ extern "C" int  gp_xp3_read_file(const char *xp3Path, const char *entryName,
                                  unsigned char **outBuf, size_t *outLen);
 extern "C" void gp_xp3_free(unsigned char *p);
 
+// KiriKiri 运行时初始化（base/win32/SysInitImpl.cpp）
+extern void TVPInitializeBaseSystems();
+
 namespace {
 
 FILE *gLog = nullptr;
@@ -63,6 +66,13 @@ extern "C" void gp_tjs2_probe(const char *xp3Path) {
 
     Console console;
     tTJS *engine = nullptr;
+
+    try {
+        TVPInitializeBaseSystems();
+        logf("[ok] TVPInitializeBaseSystems done\n");
+    } catch (...) {
+        logf("[warn] TVPInitializeBaseSystems threw\n");
+    }
     try {
         engine = new tTJS();
         engine->SetConsoleOutput(&console);

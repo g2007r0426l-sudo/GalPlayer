@@ -28,7 +28,7 @@ INC=(-I"$CORE" -I"$CORE/tjs2" -I"$CORE/base" -I"$CORE/base/win32" -I"$CORE/msg" 
      -I"$CORE/environ" -I"$CORE/environ/win32" -I"$CORE/environ/linux"
      -I"$CORE/visual" -I"$CORE/visual/win32" -I"$CORE/extension" -I"$CORE/movie"
      -I"$CORE/sound" -I"$CORE/sound/win32" -I"$CORE/../plugins"
-     -I"$KX/platform/linux/compat")
+     -I"$KX/platform/linux/compat" -I"$ROOT_DIR/engines/tjs2/iosinc")
 ONIG_INC="$ROOT_DIR/engines/kirikiroid2/third_party/oniguruma/src"
 [ -f "$ONIG_INC/oniguruma.h" ] && INC+=(-I"$ONIG_INC")
 TP="$KX/third_party"
@@ -61,6 +61,9 @@ for d in "${DIRS[@]}"; do
     for f in "$dir"/*.cpp; do
         [ -e "$f" ] || continue
         base=$(basename "$f")
+        case "$d/$base" in
+            base/win32/FuncStubs.cpp) continue ;;
+        esac
         obj="$OBJ_DIR/${d//\//_}_${base%.cpp}.o"
         if clang++ "${CXXFLAGS[@]}" -c "$f" -o "$obj" 2> "$OBJ_DIR/${base}.log"; then
             OK=$((OK+1))
