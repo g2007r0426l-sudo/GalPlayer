@@ -260,7 +260,9 @@ public:
             rc.set_width((int)t->GetWidth());
             rc.set_height((int)t->GetHeight());
         }
-        tRenderTextureArray<tTVPRect> single(const_cast<std::pair<iTVPTexture2D *, tTVPRect> *>(&textures[0]), 1);
+        std::pair<iTVPTexture2D *, tTVPRect> one(textures[0].first,
+            tTVPRect(0, 0, (tjs_int)textures[0].first->GetWidth(), (tjs_int)textures[0].first->GetHeight()));
+        tRenderTextureArray<tTVPRect> single(&one, 1);
         OperateRect(method, target, reftar, rc, single);
         (void)pttar;
     }
@@ -277,7 +279,9 @@ public:
             rc.set_width((int)t->GetWidth());
             rc.set_height((int)t->GetHeight());
         }
-        tRenderTextureArray<tTVPRect> single(const_cast<std::pair<iTVPTexture2D *, tTVPRect> *>(&textures[0]), 1);
+        std::pair<iTVPTexture2D *, tTVPRect> one(textures[0].first,
+            tTVPRect(0, 0, (tjs_int)textures[0].first->GetWidth(), (tjs_int)textures[0].first->GetHeight()));
+        tRenderTextureArray<tTVPRect> single(&one, 1);
         OperateRect(method, target, reftar, rc, single);
         (void)pttar;
     }
