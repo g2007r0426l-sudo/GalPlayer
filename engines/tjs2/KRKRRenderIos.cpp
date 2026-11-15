@@ -213,7 +213,7 @@ public:
         if (!src) return;
 
         int opa = 255;
-        if (auto *m = dynamic_cast<CpuRenderMethod *>(method)) opa = std::clamp(m->opa, 0, 255);
+        if (auto *m = dynamic_cast<CpuRenderMethod *>(method)) { opa = m->opa; if (opa < 0) opa = 0; if (opa > 255) opa = 255; }
         const tTVPRect &rs = textures[0].second;
 
         int dw = rctar.get_width(), dh = rctar.get_height();
