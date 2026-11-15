@@ -247,25 +247,41 @@ public:
         }
     }
 
-    void OperateTriangles(iTVPRenderMethod *method, int nTriangles, iTVPTexture2D *tar,
-                          const tTVPRect &rctar,
+    void OperateTriangles(iTVPRenderMethod *method, int nTriangles,
+                          iTVPTexture2D *target, iTVPTexture2D *reftar,
+                          const tTVPRect &rcclip, const tTVPPointD *pttar,
                           const tRenderTexQuadArray &textures) override {
-        // 三角形用包围盒近似（KAG 极少用，先保证不崩）
-        if (nTriangles > 0) {
-            tRenderTexRectArray rects;
-            (void)rects;
+        // 三角形/透视在 KAG 里极少用；先按「整块矩形」近似，保证不崩
+        if (nTriangles <= 0 || !target || textures.size() == 0) return;
+        auto *t = dynamic_cast<CpuTexture *>(target);
+        if (!t) return;
+        tTVPRect rc = rcclip;
+        if (rc.get_width() <= 0 || rc.get_height() <= 0) {
+            rc.set_width(t->Width);
+            rc.set_height(t->Height);
         }
-        (void)method; (void)tar; (void)rctar; (void)textures;
+        tRenderTextureArray<tTVPRect> single(const_cast<std::pair<iTVPTexture2D *, tTVPRect> *>(&textures[0]), 1);
+        OperateRect(method, target, reftar, rc, single);
+        (void)pttar;
     }
 
     void OperatePerspective(iTVPRenderMethod *method, int nQuads, iTVPTexture2D *target,
-                            const tTVPRect &rctar, const tRenderTexQuadArray &textures) override {
-        (void)method; (void)nQuads; (void)target; (void)rctar; (void)textures;
+                            iTVPTexture2D *reftar, const tTVPRect &rcclip,
+                            const tTVPPointD *pttar,
+                            const tRenderTexQuadArray &textures) override {
+        if (nQuads <= 0 || !target || textures.size() == 0) return;
+        auto *t = dynamic_cast<CpuTexture *>(target);
+        if (!t) return;
+        tTVPRect rc = rcclip;
+        if (rc.get_width() <= 0 || rc.get_height() <= 0) {
+            rc.set_width(t->Width);
+            rc.set_height(t->Height);
+        }
+        tRenderTextureArray<tTVPRect> single(const_cast<std::pair<iTVPTexture2D *, tTVPRect> *>(&textures[0]), 1);
+        OperateRect(method, target, reftar, rc, single);
+        (void)pttar;
     }
 
-    iTVPRenderMethod *GetRenderMethod(tjs_int opa, bool hda, int method) override {
-        return new CpuRenderMethod((int)opa, hda, method);
-    }
 };
 
 CpuRenderManager *gRenderManager = nullptr;
@@ -287,4 +303,9 @@ iTVPRenderManager *TVPGetRenderManager(const TJS::tTJSString &name) {
 
 void TVPRegisterRenderManager(const char *, iTVPRenderManager *(*func)()) {
     (void)func;   // iOS 只有软件渲染
+}
+
+// 上游在 RenderManager.cpp 内实现；这里给 CPU 版本（只携带混合参数）
+iTVPRenderMethod *iTVPRenderManager::GetRenderMethod(tjs_int opa, bool hda, int method) {
+    return new CpuRenderMethod((int)opa, hda, method);
 }
