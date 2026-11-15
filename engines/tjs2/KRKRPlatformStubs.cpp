@@ -32,12 +32,6 @@
 ttstr TVPGetOSName()       { return ttstr("iOS"); }
 ttstr TVPGetPlatformName() { return ttstr("iOS"); }
 
-// --------------------------------------------------------------------------- 图形缓存
-static tjs_uint64 gGraphicCacheLimit = 64ull * 1024 * 1024;
-
-void TVPSetGraphicCacheLimit(tjs_uint64 limit) { gGraphicCacheLimit = limit; }
-tjs_uint64 TVPGetGraphicCacheLimit()          { return gGraphicCacheLimit; }
-
 // --------------------------------------------------------------------------- 输入
 bool TVPGetKeyMouseAsyncState(tjs_uint keycode, bool get) { (void)keycode; (void)get; return false; }
 bool TVPGetJoyPadAsyncState(tjs_uint keycode, bool get)   { (void)keycode; (void)get; return false; }
@@ -67,9 +61,6 @@ bool TVPShowSimpleInputBox(ttstr &text, const ttstr &caption,
                   prompt.AsStdString().c_str());
     return false;
 }
-
-// --------------------------------------------------------------------------- 颜色
-tjs_uint32 TVPToActualColor(tjs_uint32 color) { return color; }
 
 // --------------------------------------------------------------------------- 配置管理（内存版）
 void iSysConfigManager::Initialize() { ConfigUpdated = false; }

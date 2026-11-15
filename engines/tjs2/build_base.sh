@@ -96,12 +96,6 @@ for d in base base/win32 msg msg/win32 utils utils/win32 utils/encoding extensio
     done
 done
 
-# 软件绘制设备（TVP 的 BasicDrawDevice：纯 CPU 合成）
-BBD=$(find "$CORE/visual" -name "BasicDrawDevice.cpp" -print -quit)
-if [ -n "$BBD" ]; then
-    compile_one "$BBD" "visual/BasicDrawDevice.cpp"
-fi
-
 # iOS 软件渲染管理器（CPU 纹理 + 合成）
 compile_one "$ROOT_DIR/engines/tjs2/KRKRRenderIos.cpp" "ios/KRKRRenderIos.cpp"
 compile_one "$ROOT_DIR/engines/tjs2/KRKRAudioStubs.cpp" "ios/KRKRAudioStubs.cpp"
