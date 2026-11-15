@@ -44,9 +44,9 @@ for h in ft2build.h png.h turbojpeg.h decode.h SDL.h; do
     fi
 done
 
-FLAGS="-std=c++14 -O2 $ARCH -fexceptions -frtti -w -DTJS_TEXT_OUT_CRLF -D__STDC_CONSTANT_MACROS -D_7ZIP_ST -DLINUX -DKR2_IOS"
+FLAGS="-std=c++14 -O2 $ARCH -fexceptions -frtti -w -DTJS_TEXT_OUT_CRLF -D__STDC_CONSTANT_MACROS -D_7ZIP_ST -DLINUX -DKR2_IOS -include kr2_ios_prelude.h"
 
-SKIP_LIST=" base/win32/FuncStubs.cpp base/7zArchive.cpp base/UtilStreams.cpp base/ZIPArchive.cpp base/win32/StorageImpl.cpp base/win32/SusieArchive.cpp msg/win32/MsgLoad.cpp msg/win32/ReadOptionDesc.cpp "
+SKIP_LIST="  base/7zArchive.cpp  base/ZIPArchive.cpp base/win32/StorageImpl.cpp base/win32/SusieArchive.cpp msg/win32/MsgLoad.cpp msg/win32/ReadOptionDesc.cpp "
 
 OK=0
 FAIL=0
@@ -91,6 +91,12 @@ for d in base base/win32 msg msg/win32 utils utils/win32 utils/encoding extensio
         compile_one "$f" "$rel"
     done
 done
+
+# 软件绘制设备（TVP 的 BasicDrawDevice：纯 CPU 合成）
+BBD=$(find "$CORE/visual" -name "BasicDrawDevice.cpp" -print -quit)
+if [ -n "$BBD" ]; then
+    compile_one "$BBD" "visual/BasicDrawDevice.cpp"
+fi
 
 # iOS 平台层实现
 compile_one "$ROOT_DIR/engines/tjs2/IOSPlatform.cpp" "ios/IOSPlatform.cpp"
