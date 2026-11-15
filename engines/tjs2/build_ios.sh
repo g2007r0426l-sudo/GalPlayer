@@ -67,7 +67,7 @@ CXXFLAGS=(-std=c++14 -O2 $ARCH \
           -I"$SRC_ROOT" -I"$CORE_SRC/utils" -I"$CORE_SRC/base" -I"$CORE_SRC/environ" ${ONIG_INC:+-I"$ONIG_INC"})
 
 # 排除需要宿主/图形环境的文件（保持 VM 纯净）
-SKIP_RE='tjsDate\.cpp|tjsRandomGenerator\.cpp'
+SKIP_RE='^$'   # 不再跳过任何文件（tjsDate / tjsRandomGenerator 已可编译）
 
 COUNT=0
 for f in "$SRC_ROOT"/*.cpp; do
