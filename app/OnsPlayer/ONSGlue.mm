@@ -361,10 +361,11 @@ int GP_ONS_Entry(int argc, char **argv) {
     {
         // 注意: @[...] 字面量禁止 nil 元素，必须逐个判空后 addObject
         NSMutableArray *cands = [NSMutableArray array];
-        NSString *p1 = [[NSBundle mainBundle] pathForResource:@"DroidSansFallback" ofType:@"ttf"];
-        if (p1) [cands addObject:p1];
+        // 霞鹜文楷优先：拉丁 + 中日文字形完整（DroidSansFallback 缺拉丁，英文会变方块）
         NSString *p2 = [[NSBundle mainBundle] pathForResource:@"LXGWWenKai-Regular" ofType:@"ttf"];
         if (p2) [cands addObject:p2];
+        NSString *p1 = [[NSBundle mainBundle] pathForResource:@"DroidSansFallback" ofType:@"ttf"];
+        if (p1) [cands addObject:p1];
         [cands addObject:@"/var/mobile/Documents/Galgames/default.ttf"];
         fprintf(stderr, "[ONSApp] font candidates=%lu\n", (unsigned long)cands.count);
         NSFileManager *fm = [NSFileManager defaultManager];
