@@ -46,7 +46,8 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
     private func probeGPU() {
         let dev = MTLCreateSystemDefaultDevice()
         let msg = "MTLDevice=\(dev?.name ?? "nil")\n"
-        let path = "/var/mobile/Documents/gp_gpu.log"
+        let sandboxDocs = NSSearchPathForDirectoriesInDomains(.documentDirectory, .userDomainMask, true).first ?? "/tmp"
+        let path = sandboxDocs + "/gp_gpu.log"
         if let fh = FileHandle(forWritingAtPath: path) {
             fh.seekToEndOfFile(); fh.write(msg.data(using: .utf8) ?? Data()); try? fh.close()
         } else {
