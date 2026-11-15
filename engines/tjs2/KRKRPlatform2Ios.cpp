@@ -21,6 +21,10 @@
 #include "StorageIntf.h"
 #include "GraphicsLoaderIntf.h"
 
+// iTVPRenderManager 在 RenderManager.h 里；先前置声明 cocos2d::Texture2D（接口仅作指针用）
+namespace cocos2d { class Texture2D; }
+#include "RenderManager.h"
+
 // 音频解码器 Creator：头文件干净（只依赖 WaveIntf.h），vtable 由此 TU 发出
 #include "VorbisWaveDecoder.h"
 #include "FFWaveDecoder.h"
