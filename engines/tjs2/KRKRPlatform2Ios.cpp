@@ -39,9 +39,10 @@ tTVPWaveDecoder *FFWaveDecoderCreator::Create(const ttstr &, const ttstr &) { re
 // ---------------------------------------------------------------------------
 // 视频叠加（Windows MF 后端）—— iOS 无视频播放，返回失败
 // ---------------------------------------------------------------------------
+IStream *TVPCreateIStream(TJS::tTJSBinaryStream *) { return nullptr; }
 class tTJSNI_VideoOverlay;
 class iTVPVideoOverlay;
-struct IStream;
+#include "StorageImpl.h"   // 真正的 IStream 类型与 TVPCreateIStream 声明在这里
 
 bool GetVideoOverlayObject(tTJSNI_VideoOverlay *, IStream *, const char16_t *, const char16_t *,
                            unsigned long long, iTVPVideoOverlay **) { return false; }
@@ -53,8 +54,6 @@ bool GetVideoLayerObject(tTJSNI_VideoOverlay *, IStream *, const char16_t *, con
                          unsigned long long, iTVPVideoOverlay **) { return false; }
 
 namespace TJS { class tTJSBinaryStream; }
-IStream *TVPCreateIStream(TJS::tTJSBinaryStream *) { return nullptr; }
-
 // ---------------------------------------------------------------------------
 // 字体系统（阶段一：最小可用 —— 只报一个内置字体名）
 // ---------------------------------------------------------------------------
