@@ -1,64 +1,50 @@
 // =============================================================================
 // KRKRDSPConfigIos.cpp —— 变声 DSP 桩 + IndividualConfigManager 实现
 //
-//  1) tRisaPhaseVocoderDSP：变速/变调用（KAG 的音效可选功能），iOS 先静音桩
-//     成员名/签名严格按 sound/PhaseVocoderDSP.h
+//  1) tRisaPhaseVocoderDSP：本 TU 自带最小类声明（与上游同名同签名），
+//     避开上游头里的 RingBuffer 对象成员；功能是变速/变调，播放不需要，静音桩。
+//     注意：上游 PhaseVocoderDSP.cpp 未参与编译（malloc.h 不可用），无 ODR 冲突。
 //  2) IndividualConfigManager：每游戏配置，内存版（原实现依赖 cocos FileUtils）
 // =============================================================================
 #include <cstring>
 #include <string>
 #include <vector>
 
-#include "PhaseVocoderDSP.h"
 #include "GlobalConfigManager.h"
 #include "IndividualConfigManager.h"
 
 // ---------------------------------------------------------------------------
-// tRisaPhaseVocoderDSP —— 静音桩
+// tRisaPhaseVocoderDSP —— 最小类声明 + 静音桩
 // ---------------------------------------------------------------------------
-tRisaPhaseVocoderDSP::tRisaPhaseVocoderDSP(unsigned int frameSize, unsigned int overSampling,
-                                           unsigned int channels)
-    : AnalWork(nullptr), SynthWork(nullptr), LastAnalPhase(nullptr), LastSynthPhase(nullptr),
-      FFTWorkIp(nullptr), FFTWorkW(nullptr), InputWindow(nullptr), OutputWindow(nullptr),
-      FrameSize(frameSize), OverSampling(overSampling), Frequency(0), Channels(channels),
-      InputHopSize(frameSize / (overSampling ? overSampling : 1)),
-      OutputHopSize(frameSize / (overSampling ? overSampling : 1)),
-      TimeScale(1.0f), FrequencyScale(1.0f) {}
+class tRisaPhaseVocoderDSP {
+public:
+    tRisaPhaseVocoderDSP(unsigned int framesize, unsigned int frequency, unsigned int channels);
+    ~tRisaPhaseVocoderDSP();
+    void SetTimeScale(float scale);
+    void SetFrequencyScale(float scale);
+    void SetOverSampling(unsigned int sampling);
+    unsigned long GetInputFreeSize();
+    unsigned long GetOutputReadySize();
+    unsigned long GetInputBuffer(unsigned long, float *&, unsigned long &, float *&, unsigned long &);
+    unsigned long GetOutputBuffer(unsigned long, const float *&, unsigned long &, const float *&, unsigned long &);
+    void Process();
+};
 
+tRisaPhaseVocoderDSP::tRisaPhaseVocoderDSP(unsigned int, unsigned int, unsigned int) {}
 tRisaPhaseVocoderDSP::~tRisaPhaseVocoderDSP() {}
-
-void tRisaPhaseVocoderDSP::SetTimeScale(float scale) {
-    TimeScale = scale;
-    OutputHopSize = (unsigned int)(InputHopSize * TimeScale);
-    if (OutputHopSize == 0) OutputHopSize = InputHopSize;
-}
-
-void tRisaPhaseVocoderDSP::SetFrequencyScale(float scale) { FrequencyScale = scale; }
-
-void tRisaPhaseVocoderDSP::SetOverSampling(unsigned int sampling) {
-    OverSampling = sampling;
-    InputHopSize = FrameSize / (OverSampling ? OverSampling : 1);
-    OutputHopSize = (unsigned int)(InputHopSize * TimeScale);
-    if (OutputHopSize == 0) OutputHopSize = InputHopSize;
-}
-
+void tRisaPhaseVocoderDSP::SetTimeScale(float) {}
+void tRisaPhaseVocoderDSP::SetFrequencyScale(float) {}
+void tRisaPhaseVocoderDSP::SetOverSampling(unsigned int) {}
 unsigned long tRisaPhaseVocoderDSP::GetInputFreeSize() { return (unsigned long)-1; }
 unsigned long tRisaPhaseVocoderDSP::GetOutputReadySize() { return 0; }
-
 unsigned long tRisaPhaseVocoderDSP::GetInputBuffer(unsigned long, float *&buf, unsigned long &size,
                                                    float *&, unsigned long &) {
-    buf = nullptr;
-    size = 0;
-    return 0;
+    buf = nullptr; size = 0; return 0;
 }
-
 unsigned long tRisaPhaseVocoderDSP::GetOutputBuffer(unsigned long, const float *&buf, unsigned long &size,
                                                     const float *&, unsigned long &) {
-    buf = nullptr;
-    size = 0;
-    return 0;
+    buf = nullptr; size = 0; return 0;
 }
-
 void tRisaPhaseVocoderDSP::Process() {}
 
 // ---------------------------------------------------------------------------
