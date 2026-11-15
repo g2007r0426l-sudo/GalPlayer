@@ -533,39 +533,49 @@ final class GameListViewController: UIViewController {
         present(alert, animated: true)
     }
 
+    /// 明确地交给外部播放器（只在用户点了按钮时执行）
+    private func handOff(entry: GameEntry, to player: ExternalPlayer) {
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        DispatchQueue.global(qos: .userInitiated).async {
+            do {
+                try player.handOff(gamePath: entry.path, gameName: entry.name)
+                DispatchQueue.main.async {
+                    AppSettings.shared.markPlayed(entry.name)
+                    self.showToast("已交给「\(player.displayName)」启动")
+                    self.rescan(force: true)
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    let a = UIAlertController(title: "交接失败", message: error.localizedDescription, preferredStyle: .alert)
+                    a.addAction(UIAlertAction(title: "好的", style: .default))
+                    self.present(a, animated: true)
+                }
+            }
+        }
+    }
+
     private func launch(_ entry: GameEntry) {
         let engine = EngineRegistry.shared.effectiveEngine(for: entry)
 
-        // KRKR / Artemis：交给外部播放器，不显示「正在启动游戏」遮罩（否则会一直黑屏）
+        // KRKR / Artemis：本机 App 内还没有对应引擎（GPU 不可用，必须 CPU 渲染）
+        // 不强制跳转，交给用户决定
         if engine == .kirikiri || engine == .artemis {
             let player: ExternalPlayer = (engine == .kirikiri) ? .krkrCat : .artroid
-            guard player.isInstalled else {
-                let alert = UIAlertController(title: entry.name,
-                                              message: "这是 \(engine.displayName) 引擎游戏，需要「\(player.displayName)」才能玩，本机没检测到它。",
-                                              preferredStyle: .alert)
-                alert.addAction(UIAlertAction(title: "好的", style: .default))
-                present(alert, animated: true)
-                return
+            let title = entry.name
+            let msg = engine == .kirikiri
+                ? "本机 App 内暂未内置 Kirikiri2 引擎。\n可以先用「\(player.displayName)」打开这个游戏。"
+                : "这是 Artemis 引擎游戏。\n需要用「\(player.displayName)」打开。"
+            let alert = UIAlertController(title: title, message: msg, preferredStyle: .alert)
+            if player.isInstalled {
+                alert.addAction(UIAlertAction(title: "用\(player.displayName)打开", style: .default) { [weak self] _ in
+                    self?.handOff(entry: entry, to: player)
+                })
             }
-            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-            DispatchQueue.global(qos: .userInitiated).async {
-                do {
-                    try player.handOff(gamePath: entry.path, gameName: entry.name)
-                    DispatchQueue.main.async {
-                        AppSettings.shared.markPlayed(entry.name)
-                        self.showToast("已交给「\(player.displayName)」启动")
-                        self.rescan(force: true)
-                    }
-                } catch {
-                    DispatchQueue.main.async {
-                        let alert = UIAlertController(title: "交接失败", message: error.localizedDescription, preferredStyle: .alert)
-                        alert.addAction(UIAlertAction(title: "好的", style: .default))
-                        self.present(alert, animated: true)
-                    }
-                }
-            }
+            alert.addAction(UIAlertAction(title: "取消", style: .cancel))
+            present(alert, animated: true)
             return
         }
+
         guard engine.playable else {
             let msg = engine == .artemis
                 ? "Artemis 引擎（root.pfs）一期暂不支持，建议用 Artroid+ 打开。"
