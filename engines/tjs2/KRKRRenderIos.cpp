@@ -39,7 +39,6 @@ void tTVPBitmap::Allocate(tjs_uint w, tjs_uint h, tjs_uint bpp) {
     if (bytesPerPixel <= 0) bytesPerPixel = 4;
     PitchStep = (tjs_int)w * bytesPerPixel;
     PitchBytes = PitchStep;
-    BitmapInfoSize = 0;
     RefCount = 1;
     Bits = malloc((size_t)PitchStep * (size_t)h);
     if (Bits) memset(Bits, 0, (size_t)PitchStep * (size_t)h);
@@ -49,6 +48,19 @@ tTVPBitmap::tTVPBitmap(tjs_uint w, tjs_uint h, tjs_uint bpp) {
     Bits = nullptr;
     RefCount = 0;
     Allocate(w, h, bpp);
+}
+
+tTVPBitmap::tTVPBitmap(const tTVPBitmap &r) {
+    Bits = nullptr;
+    RefCount = 0;
+    Allocate(r.GetWidth(), r.GetHeight(), r.GetBPP());
+    if (Bits && r.GetBits()) {
+        for (tjs_int y = 0; y < Height; ++y) {
+            memcpy(GetScanLine((tjs_uint)y),
+                   (const uint8_t *)r.GetBits() + (size_t)r.GetPitch() * y,
+                   (size_t)PitchStep);
+        }
+    }
 }
 
 tTVPBitmap::~tTVPBitmap() {
