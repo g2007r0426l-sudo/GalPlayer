@@ -34,13 +34,36 @@ if [ -f "$OUT" ]; then
     exit 0
 fi
 
+# ---- 1.5 oniguruma（tjsRegExp 正则引擎依赖） ----
+ONIG_ROOT="$ROOT_DIR/engines/kirikiroid2/third_party/oniguruma"
+if [ ! -f "$BUILD_ROOT/lib/libonig.a" ]; then
+    echo "[TJS2] 构建 oniguruma ..."
+    if [ ! -d "$ONIG_ROOT/.git" ]; then
+        rm -rf "$ONIG_ROOT"
+        git clone --depth 1 --branch v6.9.10 https://github.com/kkos/oniguruma.git "$ONIG_ROOT" \
+            || echo "[TJS2] WARNING: oniguruma 拉取失败"
+    fi
+    if [ -f "$ONIG_ROOT/CMakeLists.txt" ]; then
+        cmake -S "$ONIG_ROOT" -B "$ROOT_DIR/build/onig-ios" -G Ninja \
+            -DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_SYSROOT=iphoneos \
+            -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0 \
+            -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF \
+            -DONIG_BUILD_EXECUTABLES=OFF -DENABLE_ONIG_ENCODING_UTF8=ON >/dev/null
+        cmake --build "$ROOT_DIR/build/onig-ios" -j "$(sysctl -n hw.ncpu)" >/dev/null
+        lib=$(find "$ROOT_DIR/build/onig-ios" -name "libonig.a" | head -n1)
+        [ -n "$lib" ] && cp -f "$lib" "$BUILD_ROOT/lib/libonig.a" && echo "[TJS2] oniguruma OK"
+    fi
+fi
+ONIG_INC=""
+[ -f "$ONIG_ROOT/src/oniguruma.h" ] && ONIG_INC="$ONIG_ROOT/src"
+
 # ---- 2. 编译 ----
 SDK=$(xcrun --sdk iphoneos --show-sdk-path)
 ARCH="-target arm64-apple-ios14.0 -isysroot $SDK -miphoneos-version-min=14.0"
 
 CXXFLAGS=(-std=c++14 -O2 $ARCH -fno-exceptions -fno-rtti \
           -DTJS_TEXT_OUT_CRLF -D__STDC_CONSTANT_MACROS \
-          -I"$SRC_ROOT")
+          -I"$SRC_ROOT" ${ONIG_INC:+-I"$ONIG_INC"})
 
 # 排除需要宿主/图形环境的文件（保持 VM 纯净）
 SKIP_RE='tjsDate\.cpp|tjsRandomGenerator\.cpp'
