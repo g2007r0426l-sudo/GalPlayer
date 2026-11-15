@@ -44,7 +44,7 @@ for h in ft2build.h png.h turbojpeg.h decode.h SDL.h; do
     fi
 done
 
-FLAGS="-std=c++14 -O2 $ARCH -fexceptions -frtti -w -DTJS_TEXT_OUT_CRLF -D__STDC_CONSTANT_MACROS -D_7ZIP_ST -DLINUX -DKR2_IOS -include kr2_ios_prelude.h"
+FLAGS="-std=c++14 -O2 $ARCH -fexceptions -frtti -w -DTJS_TEXT_OUT_CRLF -D__STDC_CONSTANT_MACROS -D_7ZIP_ST -DLINUX -DKR2_IOS"
 
 SKIP_LIST="  base/7zArchive.cpp  base/ZIPArchive.cpp base/win32/StorageImpl.cpp base/win32/SusieArchive.cpp msg/win32/MsgLoad.cpp msg/win32/ReadOptionDesc.cpp "
 
@@ -60,6 +60,10 @@ compile_one() {
     base=$(basename "$src")
     local obj="$OBJ_DIR/$(echo "$tag" | tr '/' '_').o"
     local rc=0
+    local EXTRA=""
+    case "$tag" in
+        *FuncStubs.cpp) EXTRA="-include $ROOT_DIR/engines/tjs2/iosinc/kr2_ios_prelude.h" ;;
+    esac
     case "$src" in
         *.c)
             # C 源码：C 编译器 + C 标准（不能带 -std=c++14），否则符号会被改名
@@ -67,7 +71,7 @@ compile_one() {
                   -c "$src" -o "$obj" 2> "$OBJ_DIR/$base.log" || rc=$?
             ;;
         *)
-            clang++ $FLAGS $INC -c "$src" -o "$obj" 2> "$OBJ_DIR/$base.log" || rc=$?
+            clang++ $FLAGS $INC $EXTRA -c "$src" -o "$obj" 2> "$OBJ_DIR/$base.log" || rc=$?
             ;;
     esac
     if [ "$rc" -eq 0 ]; then
