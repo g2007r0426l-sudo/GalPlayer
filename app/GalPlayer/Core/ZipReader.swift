@@ -1,5 +1,6 @@
 import Foundation
 import Compression
+import CoreFoundation
 
 // =============================================================================
 // 极简 ZIP 解压（只依赖系统 Compression 框架，无第三方库）
@@ -52,6 +53,18 @@ enum ZipReader {
         return count
     }
 
+
+    /// 文件名解码：UTF-8 -> GBK(936) -> Shift-JIS(932) -> Latin1
+    /// 中文/日文游戏压缩包常用本地编码而非 UTF-8
+    private static func decodeName(_ data: Data) -> String {
+        if let s = String(data: data, encoding: .utf8), !s.isEmpty { return s }
+        let gbk = CFStringConvertEncodingToNSStringEncoding(CFStringEncoding(0x0630))
+        if let s = String(data: data, encoding: String.Encoding(rawValue: gbk)), !s.isEmpty { return s }
+        let sjis = CFStringConvertEncodingToNSStringEncoding(CFStringEncoding(0x0420))
+        if let s = String(data: data, encoding: String.Encoding(rawValue: sjis)), !s.isEmpty { return s }
+        return String(data: data, encoding: .isoLatin1) ?? "file"
+    }
+
     // ------------------------------------------------------------------ 中央目录
     private static func centralDirectory(_ d: Data) throws -> [Entry] {
         guard d.count > 22 else { throw ZipError.notZip }
@@ -78,9 +91,7 @@ enum ZipReader {
             let commentLen = Int(d.u16(off + 32))
             let localOff = Int(d.u32(off + 42))
             let nameData = d.subdata(in: (off + 46)..<(off + 46 + nameLen))
-            let name = String(data: nameData, encoding: .utf8)
-                ?? String(data: nameData, encoding: .isoLatin1)
-                ?? "file\(out.count)"
+            let name = decodeName(nameData)
             out.append(Entry(name: name, method: method, compressedSize: csize,
                              uncompressedSize: usize, localHeaderOffset: localOff))
             off += 46 + nameLen + extraLen + commentLen
