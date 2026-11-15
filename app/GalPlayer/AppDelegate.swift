@@ -22,6 +22,8 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
         window = win
         win.makeKeyAndVisible()
 
+        probeGPU()   // 启动时探测 GPU（判断 KRKR 是否还有希望）
+
         // 引擎退出后主窗口重新成为 key window（SDL 窗口被销毁）
         GameSession.shared.onStopped = { [weak self] in
             self?.restoreMainWindow()
