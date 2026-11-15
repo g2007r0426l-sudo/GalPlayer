@@ -85,6 +85,8 @@ done
 
 # iOS 平台层实现
 compile_one "$ROOT_DIR/engines/tjs2/IOSPlatform.cpp" "ios/IOSPlatform.cpp"
+# 图形/窗口/音频层过渡桩（先让运行时链接通过，逐步替换为真 CPU 实现）
+compile_one "$ROOT_DIR/engines/tjs2/KRKRVisualStubs.cpp" "ios/KRKRVisualStubs.cpp"
 
 echo "[KRKRBASE] ok=$OK fail=$FAIL"
 for n in $FAILED_NAMES; do
