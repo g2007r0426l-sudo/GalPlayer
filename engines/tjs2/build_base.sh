@@ -46,6 +46,10 @@ CXXFLAGS=(-std=c++14 -O2 $ARCH -fexceptions -frtti -w
           -DTJS_TEXT_OUT_CRLF -D__STDC_CONSTANT_MACROS -D_7ZIP_ST
           -DLINUX -DKR2_IOS "${INC[@]}")
 
+EXTRA_SRCS=(
+  "$ROOT_DIR/engines/tjs2/IOSPlatform.cpp"
+)
+
 DIRS=(
   "base"
   "base/win32"
@@ -73,7 +77,7 @@ FAILED_NAMES=""
 for d in "${DIRS[@]}"; do
     dir="$CORE/$d"
     [ -d "$dir" ] || continue
-    for f in "$dir"/*.cpp; do
+    for f in "$dir"/*.cpp "$dir"/*.c; do
         [ -e "$f" ] || continue
         base=$(basename "$f")
         rel="$d/$base"
@@ -86,6 +90,18 @@ for d in "${DIRS[@]}"; do
             FAILED_NAMES="$FAILED_NAMES $rel"
         fi
     done
+done
+
+for f in "${EXTRA_SRCS[@]}"; do
+    [ -e "$f" ] || continue
+    base=$(basename "$f")
+    obj="$OBJ_DIR/extra_${base%.*}.o"
+    if clang++ "${CXXFLAGS[@]}" -c "$f" -o "$obj" 2> "$OBJ_DIR/${base}.log"; then
+        OK=$((OK + 1))
+    else
+        FAIL=$((FAIL + 1))
+        FAILED_NAMES="$FAILED_NAMES extra/$base"
+    fi
 done
 
 echo "[KRKRBASE] ok=$OK fail=$FAIL"
