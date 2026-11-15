@@ -55,7 +55,19 @@ final class GameImporter: NSObject {
                     if url.lastPathComponent == "Galgames" { continue }
                     if isDir && !self.looksLikeGame(url) { continue }
                     if !isDir && url.pathExtension.lowercased() != "zip" { continue }
-                    do { try self.importAny(url); imported += 1 }
+                    do {
+                        try self.importAny(url)
+                        imported += 1
+                        // 压缩包导入成功后移走，避免每次启动重复导入
+                        if !isDir {
+                            let done = docs.appendingPathComponent("_imported")
+                            try? FileManager.default.createDirectory(at: done, withIntermediateDirectories: true)
+                            let dest = done.appendingPathComponent(url.lastPathComponent)
+                            try? FileManager.default.removeItem(at: dest)
+                            try? FileManager.default.moveItem(at: url, to: dest)
+                            GameImporter.log("archived source: \(url.lastPathComponent)")
+                        }
+                    }
                     catch {
                         let msg = "\(url.lastPathComponent)：\(error.localizedDescription)"
                         notes.append(msg)
