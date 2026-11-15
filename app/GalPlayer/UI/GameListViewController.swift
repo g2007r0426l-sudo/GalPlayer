@@ -57,6 +57,10 @@ final class GameListViewController: UIViewController {
 
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
+        // 应急：从播放器返回时若还有残留遮罩，立刻收掉（否则一直黑屏）
+        if let p = presentedViewController, p is EngineOverlayViewController {
+            p.dismiss(animated: false)
+        }
         guard !didAutoImport else { return }
         didAutoImport = true
         // 启动时自动收编「文件」App 里投放的文件夹 / zip
@@ -452,13 +456,116 @@ final class GameListViewController: UIViewController {
         } else {
             entry = visible[indexPath.item]
         }
-        let sheet = GameSettingsSheet(entry: entry)
-        sheet.modalPresentationStyle = .overFullScreen
-        present(sheet, animated: false)
+        let engineName = EngineRegistry.shared.effectiveEngine(for: entry).displayName
+        let menu = UIAlertController(title: entry.name, message: engineName, preferredStyle: .actionSheet)
+        menu.addAction(UIAlertAction(title: "\u{91cd}\u{547d}\u{540d}", style: .default) { [weak self] _ in
+            self?.promptRename(entry)
+        })
+        menu.addAction(UIAlertAction(title: "\u{9ad8}\u{7ea7}\u{8bbe}\u{7f6e}", style: .default) { [weak self] _ in
+            guard let self else { return }
+            let sheet = GameSettingsSheet(entry: entry)
+            self.present(sheet, animated: true)
+        })
+        menu.addAction(UIAlertAction(title: "\u{53d6}\u{6d88}", style: .cancel))
+        if let pop = menu.popoverPresentationController {
+            pop.sourceView = self.view
+            pop.sourceRect = CGRect(x: self.view.bounds.midX, y: self.view.bounds.midY, width: 1, height: 1)
+        }
+        present(menu, animated: true)
+    }
+
+
+    // MARK: - 轻提示
+    private var toastLabel: UILabel?
+
+    func showToast(_ text: String) {
+        toastLabel?.removeFromSuperview()
+        let lab = UILabel()
+        lab.text = text
+        lab.font = Theme.uiFont(size: 14)
+        lab.textColor = .white
+        lab.textAlignment = .center
+        lab.numberOfLines = 0
+        lab.backgroundColor = UIColor.black.withAlphaComponent(0.78)
+        lab.layer.cornerRadius = 14
+        lab.clipsToBounds = true
+        lab.alpha = 0
+        lab.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(lab)
+        NSLayoutConstraint.activate([
+            lab.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            lab.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -28),
+            lab.widthAnchor.constraint(lessThanOrEqualTo: view.widthAnchor, multiplier: 0.7),
+            lab.heightAnchor.constraint(greaterThanOrEqualToConstant: 40),
+        ])
+        toastLabel = lab
+        UIView.animate(withDuration: 0.2) { lab.alpha = 1 }
+        UIView.animate(withDuration: 0.3, delay: 1.8, options: []) {
+            lab.alpha = 0
+        } completion: { _ in lab.removeFromSuperview() }
+    }
+
+    /// 重命名游戏目录（改的是磁盘文件夹名，最直观）
+    private func promptRename(_ entry: GameEntry) {
+        let alert = UIAlertController(title: "重命名游戏", message: "会修改磁盘上的文件夹名", preferredStyle: .alert)
+        alert.addTextField { tf in
+            tf.text = entry.name
+            tf.placeholder = "游戏名"
+        }
+        alert.addAction(UIAlertAction(title: "取消", style: .cancel))
+        alert.addAction(UIAlertAction(title: "保存", style: .default) { [weak self] _ in
+            guard let self, let newName = alert.textFields?.first?.text?
+                .trimmingCharacters(in: .whitespacesAndNewlines), !newName.isEmpty else { return }
+            let parent = (entry.path as NSString).deletingLastPathComponent
+            let dest = parent + "/" + newName
+            guard dest != entry.path else { return }
+            do {
+                try FileManager.default.moveItem(atPath: entry.path, toPath: dest)
+                AppSettings.shared.markPlayed(newName)
+                self.rescan(force: true)
+                self.showToast("已重命名为「\(newName)」")
+            } catch {
+                let err = UIAlertController(title: "重命名失败", message: error.localizedDescription, preferredStyle: .alert)
+                err.addAction(UIAlertAction(title: "好的", style: .default))
+                self.present(err, animated: true)
+            }
+        })
+        present(alert, animated: true)
     }
 
     private func launch(_ entry: GameEntry) {
         let engine = EngineRegistry.shared.effectiveEngine(for: entry)
+
+        // KRKR / Artemis：交给外部播放器，不显示「正在启动游戏」遮罩（否则会一直黑屏）
+        if engine == .kirikiri || engine == .artemis {
+            let player: ExternalPlayer = (engine == .kirikiri) ? .krkrCat : .artroid
+            guard player.isInstalled else {
+                let alert = UIAlertController(title: entry.name,
+                                              message: "这是 \(engine.displayName) 引擎游戏，需要「\(player.displayName)」才能玩，本机没检测到它。",
+                                              preferredStyle: .alert)
+                alert.addAction(UIAlertAction(title: "好的", style: .default))
+                present(alert, animated: true)
+                return
+            }
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+            DispatchQueue.global(qos: .userInitiated).async {
+                do {
+                    try player.handOff(gamePath: entry.path, gameName: entry.name)
+                    DispatchQueue.main.async {
+                        AppSettings.shared.markPlayed(entry.name)
+                        self.showToast("已交给「\(player.displayName)」启动")
+                        self.rescan(force: true)
+                    }
+                } catch {
+                    DispatchQueue.main.async {
+                        let alert = UIAlertController(title: "交接失败", message: error.localizedDescription, preferredStyle: .alert)
+                        alert.addAction(UIAlertAction(title: "好的", style: .default))
+                        self.present(alert, animated: true)
+                    }
+                }
+            }
+            return
+        }
         guard engine.playable else {
             let msg = engine == .artemis
                 ? "Artemis 引擎（root.pfs）一期暂不支持，建议用 Artroid+ 打开。"
@@ -475,7 +582,8 @@ final class GameListViewController: UIViewController {
             GameSession.shared.start(entry: entry) { [weak self] result in
                 switch result {
                 case .success:
-                    break // SDL 窗口将全屏接管
+                    self?.presentedViewController?.dismiss(animated: false)
+                    self?.rescan(force: true)
                 case .failure(let err):
                     self?.presentedViewController?.dismiss(animated: false)
                     let alert = UIAlertController(title: "启动失败", message: err.message, preferredStyle: .alert)
