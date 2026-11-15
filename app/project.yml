@@ -65,6 +65,8 @@ targets:
     platform: iOS
     sources:
       - path: OnsPlayer
+      - path: ../engines/tjs2/TJS2Probe.cpp
+      - path: ../engines/tjs2/XP3Bridge.mm
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.yg.onsplayer
@@ -78,6 +80,8 @@ targets:
           - "-lc++"
           - "-lSDL2"
           - "-lons"
+          - "-ltjs2"
+          - "-lonig"
           - "-lSDL2_image"
           - "-lSDL2_ttf"
           - "-lSDL2_mixer"

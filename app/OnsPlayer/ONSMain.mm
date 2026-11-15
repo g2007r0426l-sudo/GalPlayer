@@ -21,7 +21,15 @@
 // 由 ONSGlue.mm 提供：读标记文件 / 切换工作目录 / 装触控映射 / 调 ons_main
 int GP_ONS_Entry(int argc, char **argv);
 
+// TJS2 引擎探针（验证 libtjs2 在真机可用）
+extern "C" void gp_tjs2_probe(const char *xp3Path);
+
 int main(int argc, char *argv[]) {
     fprintf(stderr, "[ONSApp] main() 启动\n");
+    // 启动时跑一次 TJS2 探针（结果写 /var/mobile/Documents/tjs2_probe.log）
+    {
+        const char *xp = "/var/mobile/Containers/Data/Application/5BB7D713-3C56-4E92-A0FA-0E5FD75B63C5/Documents/Games/Galgame/data.xp3";
+        gp_tjs2_probe(xp);
+    }
     return SDL_UIKitRunApp(argc, argv, GP_ONS_Entry);
 }
