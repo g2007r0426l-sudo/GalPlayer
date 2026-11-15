@@ -27,7 +27,9 @@ ONIG_INC="$ROOT_DIR/engines/kirikiroid2/third_party/oniguruma/src"
 SDK=$(xcrun --sdk iphoneos --show-sdk-path)
 ARCH="-target arm64-apple-ios14.0 -isysroot $SDK -miphoneos-version-min=14.0"
 
-INC=(-I"$SRC" -I"$TJS_INC" -I"$CORE/utils" -I"$CORE/base" -I"$CORE/environ" -I"$CORE")
+INC=(-I"$SRC" -I"$TJS_INC" -I"$CORE/utils" -I"$CORE/base" -I"$CORE/environ" -I"$CORE"
+     -I"$CORE/msg" -I"$CORE/visual" -I"$CORE/extension" -I"$CORE/movie" -I"$CORE/sound"
+     -I"$CORE/../plugins")
 [ -f "$ONIG_INC/oniguruma.h" ] && INC+=(-I"$ONIG_INC")
 # third_party 根（7zip C API: 7zip/C/7z.h）
 TP="$ROOT_DIR/engines/kirikiroid2/Kirikinux2/third_party"
