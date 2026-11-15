@@ -61,7 +61,7 @@ ONIG_INC=""
 SDK=$(xcrun --sdk iphoneos --show-sdk-path)
 ARCH="-target arm64-apple-ios14.0 -isysroot $SDK -miphoneos-version-min=14.0"
 
-CXXFLAGS=(-std=c++14 -O2 $ARCH -fno-exceptions -fno-rtti \
+CXXFLAGS=(-std=c++14 -O2 $ARCH \
           -DTJS_TEXT_OUT_CRLF -D__STDC_CONSTANT_MACROS \
           -I"$SRC_ROOT" ${ONIG_INC:+-I"$ONIG_INC"})
 
