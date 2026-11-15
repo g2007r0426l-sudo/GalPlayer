@@ -17,19 +17,13 @@
 // tRisaPhaseVocoderDSP —— 静音桩
 // ---------------------------------------------------------------------------
 tRisaPhaseVocoderDSP::tRisaPhaseVocoderDSP(unsigned int frameSize, unsigned int overSampling,
-                                           unsigned int channels) {
-    AnalWork = nullptr; SynthWork = nullptr;
-    LastAnalPhase = nullptr; LastSynthPhase = nullptr;
-    FFTWorkIp = nullptr; FFTWorkW = nullptr;
-    InputWindow = nullptr; OutputWindow = nullptr;
-    FrameSize = frameSize;
-    OverSampling = overSampling;
-    Channels = channels;
-    InputHopSize = FrameSize / (OverSampling ? OverSampling : 1);
-    OutputHopSize = InputHopSize;
-    TimeScale = 1.0f;
-    FrequencyScale = 1.0f;
-}
+                                           unsigned int channels)
+    : AnalWork(nullptr), SynthWork(nullptr), LastAnalPhase(nullptr), LastSynthPhase(nullptr),
+      FFTWorkIp(nullptr), FFTWorkW(nullptr), InputWindow(nullptr), OutputWindow(nullptr),
+      FrameSize(frameSize), OverSampling(overSampling), Frequency(0), Channels(channels),
+      InputHopSize(frameSize / (overSampling ? overSampling : 1)),
+      OutputHopSize(frameSize / (overSampling ? overSampling : 1)),
+      TimeScale(1.0f), FrequencyScale(1.0f) {}
 
 tRisaPhaseVocoderDSP::~tRisaPhaseVocoderDSP() {}
 
