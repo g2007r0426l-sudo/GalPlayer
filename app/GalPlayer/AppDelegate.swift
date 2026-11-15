@@ -23,6 +23,7 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
         win.makeKeyAndVisible()
 
         probeGPU()   // 启动时探测 GPU（判断 KRKR 是否还有希望）
+        probeXP3()
 
         // 引擎退出后主窗口重新成为 key window（SDL 窗口被销毁）
         GameSession.shared.onStopped = { [weak self] in
@@ -54,6 +55,25 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
             try? msg.write(toFile: path, atomically: true, encoding: .utf8)
             try? FileManager.default.setAttributes([.posixPermissions: 0o666], ofItemAtPath: path)
         }
+        NSLog("[GalPlayer] %@", msg)
+    }
+
+
+    /// 临时探针：验证 Swift 版 XP3 解析能否读出游戏名
+    private func probeXP3() {
+        let candidates = [
+            "/var/mobile/Containers/Data/Application/5BB7D713-3C56-4E92-A0FA-0E5FD75B63C5/Documents/Games/Galgame/data.xp3",
+            GameImporter.gamesRoot + "/Games/Galgame/data.xp3"
+        ]
+        var msg = "XP3 probe\n"
+        for p in candidates where FileManager.default.fileExists(atPath: p) {
+            let t0 = Date()
+            let title = XP3.gameTitle(at: p)
+            let n = (try? XP3.entries(at: p).count) ?? -1
+            msg += "path=\(p)\nentries=\(n) title=\(title ?? "nil") cost=\(String(format: "%.2f", Date().timeIntervalSince(t0)))s\n"
+        }
+        let out = (NSSearchPathForDirectoriesInDomains(.documentDirectory, .userDomainMask, true).first ?? "/tmp") + "/gp_xp3.log"
+        try? msg.write(toFile: out, atomically: true, encoding: .utf8)
         NSLog("[GalPlayer] %@", msg)
     }
 
